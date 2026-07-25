@@ -12,7 +12,7 @@
   /* max() fallback: Android WebView often reports safe-area as 0 under edge-to-edge */
   --safe-top: max(env(safe-area-inset-top, 0px), 36px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --nav-h: 64px;
+  --nav-h: 56px;
 }
 
 * {
@@ -172,6 +172,10 @@ body.sky-mood-cloudy .place-card {
 .sky-mood-rain .sky-rain {
   opacity: 0.85;
 }
+.sky-mood-rain .sky-stars,
+.sky-mood-rain .sky-moon {
+  opacity: 0;
+}
 .sky-mood-rain .sky-vignette {
   background: linear-gradient(180deg, rgba(6, 10, 16, 0.35) 0%, rgba(6, 10, 16, 0.75) 100%);
 }
@@ -190,6 +194,93 @@ body.sky-mood-rain .bottom-nav {
   background: rgba(8, 12, 20, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+/* --- Night: deep sky + stars + soft moon --- */
+.sky-mood-night .sky-gradient {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(40, 50, 90, 0.35) 0%, transparent 55%),
+    linear-gradient(180deg, #050810 0%, #0a1020 40%, #121a30 100%);
+}
+.sky-mood-night .sky-sun {
+  opacity: 0;
+}
+.sky-mood-night .sky-clouds {
+  opacity: 0.12;
+  filter: brightness(0.35);
+}
+.sky-mood-night .sky-rain {
+  opacity: 0;
+}
+.sky-mood-night .sky-stars {
+  opacity: 1;
+}
+.sky-mood-night .sky-moon {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 78% 14%, #f0f4ff 0%, #d8e0f0 8%, rgba(200, 210, 240, 0.25) 16%, transparent 32%);
+}
+.sky-mood-night .sky-vignette {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+body.sky-mood-night {
+  --bg: transparent;
+  --surface: rgba(12, 16, 28, 0.7);
+  --surface-2: rgba(20, 26, 42, 0.75);
+  --border: rgba(140, 160, 220, 0.14);
+  --text: #e8eef6;
+  --text-muted: #9aabc4;
+  --temp: #f5f8ff;
+  --accent: #8eb4f0;
+}
+body.sky-mood-night .header,
+body.sky-mood-night .bottom-nav {
+  background: rgba(6, 10, 18, 0.62);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+body.sky-mood-night .metric,
+body.sky-mood-night .hour-card,
+body.sky-mood-night .day-row,
+body.sky-mood-night .settings-group,
+body.sky-mood-night .place-card,
+body.sky-mood-night .sun-times {
+  background: rgba(14, 18, 32, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sky-stars {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  animation: twinkle ease-in-out infinite alternate;
+  opacity: 0.85;
+}
+@keyframes twinkle {
+  from { opacity: 0.35; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.sky-moon {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+
+/* Hide stars/moon on day moods */
+.sky-mood-sunny .sky-stars,
+.sky-mood-sunny .sky-moon,
+.sky-mood-cloudy .sky-stars,
+.sky-mood-cloudy .sky-moon,
+.sky-mood-default .sky-stars,
+.sky-mood-default .sky-moon {
+  opacity: 0;
 }
 
 /* Toggle off → hide sky art, solid black app */
@@ -331,26 +422,39 @@ body.sky-mood-default {
   opacity: 0;
 }
 
-/* Header — clear system status bar (viewport-fit=cover) */
+/* Header — compact + fixed footprint (no vertical jump) */
 .header {
-  padding: calc(12px + var(--safe-top)) 16px 10px;
+  padding: calc(4px + var(--safe-top)) 10px 4px;
   background: rgba(11, 15, 20, 0.72);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   transition: background 0.5s ease, border-color 0.5s ease;
 }
 
+.brand-name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  line-height: 12px;
+  height: 12px;
+  margin: 0 2px 0;
+  opacity: 0.9;
+}
+
 .location-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
+  height: 36px;
 }
 
 .loc-name {
   flex: 1;
   min-width: 0;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 600;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -373,15 +477,26 @@ body.sky-mood-default {
   flex-shrink: 0;
 }
 
+.header .header-icon {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px;
+  font-size: 1.1rem;
+}
+
 .icon-btn:active {
   background: var(--surface-2);
 }
 
 .status {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
-  margin-top: 4px;
-  min-height: 1em;
+  margin: 0 2px;
+  height: 14px;
+  line-height: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Screens */
@@ -389,36 +504,74 @@ body.sky-mood-default {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
   -webkit-overflow-scrolling: touch;
 }
 
 .screen {
   display: none;
-  padding: 16px;
+  padding: 12px 14px 10px;
 }
 
 .screen.active {
   display: block;
 }
 
-/* Today — current */
+/* Today — even vertical rhythm, no extra 3-day block */
 .current {
   text-align: center;
-  padding: 24px 0 16px;
+  padding: 18px 0 14px;
+}
+
+.sun-times {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin: 16px auto 0;
+  max-width: 280px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-height: 52px;
+  box-sizing: border-box;
+}
+.sun-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 80px;
+}
+.sun-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+.sun-value {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.3;
+  min-height: 1.3em;
 }
 
 .temp-now {
-  font-size: 5.5rem;
+  font-size: 5rem;
   font-weight: 200;
   letter-spacing: -2px;
   line-height: 1;
+  height: 5rem;
   color: var(--temp);
 }
 
 .cond-now {
-  font-size: 1.25rem;
-  margin-top: 4px;
+  font-size: 1.15rem;
+  margin-top: 6px;
+  min-height: 1.4em;
+  line-height: 1.35;
   color: var(--text);
 }
 
@@ -426,14 +579,16 @@ body.sky-mood-default {
   font-size: 0.95rem;
   color: var(--text-muted);
   margin-top: 4px;
+  min-height: 1.25em;
+  line-height: 1.25;
 }
 
 /* Metrics grid */
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 16px 0;
+  gap: 10px;
+  margin: 18px 0 16px;
 }
 
 .metric {
@@ -444,26 +599,31 @@ body.sky-mood-default {
 }
 
 .metric-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .metric-value {
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 600;
   margin-top: 4px;
 }
 
 /* Hourly */
 .section-title {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.hourly-wrap {
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .hourly {
@@ -475,7 +635,7 @@ body.sky-mood-default {
 }
 
 .hour-card {
-  flex: 0 0 64px;
+  flex: 0 0 62px;
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 6px;
@@ -483,18 +643,18 @@ body.sky-mood-default {
 }
 
 .hour-time {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
 .hour-temp {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  margin: 6px 0 4px;
+  margin: 5px 0 3px;
 }
 
 .hour-icon {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
 }
 
 /* 10-Day */
@@ -653,10 +813,10 @@ button.setting-btn:active {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  font-size: 0.7rem;
+  gap: 1px;
+  font-size: 0.65rem;
   cursor: pointer;
-  padding-top: 6px;
+  padding-top: 4px;
 }
 
 .nav-btn.active {

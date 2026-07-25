@@ -36,7 +36,7 @@
 
         <!-- Home + lock-screen widget -->
         <receiver
-            android:name=".PureSkyWidgetProvider"
+            android:name=".GeauxWeatherWidgetProvider"
             android:exported="true"
             android:label="@string/widget_name">
             <intent-filter>
@@ -44,7 +44,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/puresky_widget_info" />
+                android:resource="@xml/geaux_widget_info" />
         </receiver>
     </application>
 

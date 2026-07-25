@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Compact layout for lock screen when the OS supports keyguard widgets -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@drawable/widget_bg">
+    android:padding="10dp"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical">
 
     <TextView
         android:id="@+id/widget_location"
@@ -13,9 +15,9 @@
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="PureSky"
+        android:text="GeauxWeather"
         android:textColor="#B0BEC5"
-        android:textSize="12sp" />
+        android:textSize="11sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -30,7 +32,7 @@
             android:layout_height="wrap_content"
             android:text="—°"
             android:textColor="#FFFFFF"
-            android:textSize="36sp"
+            android:textSize="32sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
@@ -39,12 +41,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:ellipsize="end"
             android:maxLines="2"
             android:text="Open app to load"
             android:textColor="#E8EEF6"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
     </LinearLayout>
 
     <TextView
@@ -54,5 +56,5 @@
         android:layout_marginTop="2dp"
         android:text="H —°  L —°"
         android:textColor="#8B9BB4"
-        android:textSize="12sp" />
+        android:textSize="11sp" />
 </LinearLayout>

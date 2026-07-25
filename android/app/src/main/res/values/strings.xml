@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">PureSky</string>
-    <string name="title_activity_main">PureSky</string>
-    <string name="package_name">com.puresky.weather</string>
-    <string name="custom_url_scheme">com.puresky.weather</string>
-    <string name="widget_name">PureSky</string>
+    <string name="app_name">GeauxWeather</string>
+    <string name="title_activity_main">GeauxWeather</string>
+    <string name="package_name">com.geauxweather.app</string>
+    <string name="custom_url_scheme">com.geauxweather.app</string>
+    <string name="widget_name">GeauxWeather</string>
     <string name="widget_description">Current conditions and today\'s high/low</string>
 </resources>

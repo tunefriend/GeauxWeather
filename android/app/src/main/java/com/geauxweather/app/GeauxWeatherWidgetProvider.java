@@ -1,4 +1,4 @@
-package com.puresky.weather;
+package com.geauxweather.app;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -13,12 +13,12 @@ import org.json.JSONObject;
 
 /**
  * Home / lock-screen widget. Reads snapshot from Capacitor Preferences
- * (SharedPreferences file "CapacitorStorage", key "puresky_widget").
+ * (SharedPreferences file "CapacitorStorage", key "geauxweather_widget").
  */
-public class PureSkyWidgetProvider extends AppWidgetProvider {
+public class GeauxWeatherWidgetProvider extends AppWidgetProvider {
 
     private static final String PREFS_FILE = "CapacitorStorage";
-    private static final String KEY_WIDGET = "puresky_widget";
+    private static final String KEY_WIDGET = "geauxweather_widget";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -29,7 +29,7 @@ public class PureSkyWidgetProvider extends AppWidgetProvider {
 
     public static void refreshAll(Context context) {
         AppWidgetManager mgr = AppWidgetManager.getInstance(context);
-        ComponentName cn = new ComponentName(context, PureSkyWidgetProvider.class);
+        ComponentName cn = new ComponentName(context, GeauxWeatherWidgetProvider.class);
         int[] ids = mgr.getAppWidgetIds(cn);
         if (ids == null || ids.length == 0) return;
         for (int id : ids) {
@@ -38,7 +38,7 @@ public class PureSkyWidgetProvider extends AppWidgetProvider {
     }
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.puresky_widget);
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.geaux_widget);
         Snapshot data = readSnapshot(context);
 
         views.setTextViewText(R.id.widget_location, data.location);
@@ -76,13 +76,13 @@ public class PureSkyWidgetProvider extends AppWidgetProvider {
     }
 
     private static Snapshot readSnapshot(Context context) {
-        Snapshot fallback = new Snapshot("PureSky", "—°", "Open app to load", "H —°  L —°");
+        Snapshot fallback = new Snapshot("GeauxWeather", "—°", "Open app to load", "H —°  L —°");
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE);
             String raw = prefs.getString(KEY_WIDGET, null);
             if (raw == null) return fallback;
             JSONObject o = new JSONObject(raw);
-            String loc = o.optString("label", "PureSky");
+            String loc = o.optString("label", "GeauxWeather");
             String temp = o.optString("temp", "—°");
             String cond = o.optString("condition", "—");
             String high = o.optString("high", "—");

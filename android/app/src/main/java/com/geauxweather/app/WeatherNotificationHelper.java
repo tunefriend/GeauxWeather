@@ -1,4 +1,4 @@
-package com.puresky.weather;
+package com.geauxweather.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -26,10 +26,10 @@ import org.json.JSONObject;
  */
 public final class WeatherNotificationHelper {
 
-    private static final String CHANNEL_ID = "puresky_weather_status";
+    private static final String CHANNEL_ID = "geauxweather_status";
     private static final int NOTIF_ID = 42;
     private static final String PREFS_FILE = "CapacitorStorage";
-    private static final String KEY_WIDGET = "puresky_widget";
+    private static final String KEY_WIDGET = "geauxweather_widget";
 
     private WeatherNotificationHelper() {}
 
@@ -46,7 +46,7 @@ public final class WeatherNotificationHelper {
             JSONObject o = new JSONObject(raw);
             String temp = o.optString("temp", "—°");
             String condition = o.optString("condition", "—");
-            String label = o.optString("label", "PureSky");
+            String label = o.optString("label", "GeauxWeather");
             String digits = tempDigits(temp);
 
             Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
@@ -62,7 +62,7 @@ public final class WeatherNotificationHelper {
             }
 
             String text = stripEmoji(condition);
-            if (label != null && !label.isEmpty() && !"PureSky".equals(label)) {
+            if (label != null && !label.isEmpty() && !"GeauxWeather".equals(label)) {
                 text = text + " · " + label;
             }
 

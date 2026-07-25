@@ -1,6 +1,6 @@
 {
-  "appId": "com.puresky.weather",
-  "appName": "PureSky",
+  "appId": "com.geauxweather.app",
+  "appName": "GeauxWeather",
   "webDir": "www",
   "server": {
     "androidScheme": "https"

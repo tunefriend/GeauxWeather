@@ -1,4 +1,4 @@
-package com.puresky.weather;
+package com.geauxweather.app;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -15,17 +15,17 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(PureSkyNativePlugin.class);
+        registerPlugin(GeauxWeatherNativePlugin.class);
         super.onCreate(savedInstanceState);
         requestNotifPermissionIfNeeded();
-        PureSkyWidgetProvider.refreshAll(this);
+        GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        PureSkyWidgetProvider.refreshAll(this);
+        GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
     }
 

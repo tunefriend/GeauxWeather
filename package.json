@@ -1,7 +1,7 @@
 {
-  "name": "puresky",
-  "version": "1.1.0",
-  "description": "PureSky — clean, fast, no-ads weather for Android",
+  "name": "geauxweather",
+  "version": "1.0.0",
+  "description": "GeauxWeather \u2014 clean, fast, no-ads weather for Android",
   "main": "index.js",
   "scripts": {
     "sync": "npx cap sync android",

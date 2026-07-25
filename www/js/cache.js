@@ -3,8 +3,8 @@
  * localStorage now; Capacitor Preferences when native
  */
 (function (global) {
-  const FORECAST_KEY = 'puresky_last_forecast';
-  const LOC_KEY = 'puresky_location';
+  const FORECAST_KEY = 'geauxweather_last_forecast';
+  const LOC_KEY = 'geauxweather_location';
   const MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6h still "useful"
 
   function readRaw(key) {

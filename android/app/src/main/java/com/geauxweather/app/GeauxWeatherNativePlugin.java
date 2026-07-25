@@ -1,4 +1,4 @@
-package com.puresky.weather;
+package com.geauxweather.app;
 
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -8,13 +8,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 /**
  * Bridge from web UI → home widget + status-bar temp notification.
  */
-@CapacitorPlugin(name = "PureSkyNative")
-public class PureSkyNativePlugin extends Plugin {
+@CapacitorPlugin(name = "GeauxWeatherNative")
+public class GeauxWeatherNativePlugin extends Plugin {
 
     @PluginMethod
     public void refreshChrome(PluginCall call) {
         try {
-            PureSkyWidgetProvider.refreshAll(getContext());
+            GeauxWeatherWidgetProvider.refreshAll(getContext());
             WeatherNotificationHelper.update(getContext());
             call.resolve();
         } catch (Exception e) {

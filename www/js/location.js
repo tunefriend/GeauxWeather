@@ -7,9 +7,9 @@
   // Open-Meteo has no reverse endpoint; use Nominatim (OSM) for nearest city
   const REVERSE_NOMINATIM =
     'https://nominatim.openstreetmap.org/reverse';
-  const LOC_KEY = 'puresky_location'; // active home location (Today)
-  const DEFAULT_KEY = 'puresky_default'; // preferred city when GPS is off
-  const PLACES_KEY = 'puresky_places';
+  const LOC_KEY = 'geauxweather_location'; // active home location (Today)
+  const DEFAULT_KEY = 'geauxweather_default'; // preferred city when GPS is off
+  const PLACES_KEY = 'geauxweather_places';
 
   function isNative() {
     return !!(

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#0b0f14" />
-  <title>PureSky</title>
+  <title>GeauxWeather</title>
   <link rel="stylesheet" href="css/app.css" />
   <!-- Leaflet (CDN for preview; vendor into www/lib for offline builds) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -23,18 +23,21 @@
       <span class="cloud c4"></span>
     </div>
     <div class="sky-layer sky-rain"></div>
+    <div class="sky-layer sky-stars" id="sky-stars"></div>
+    <div class="sky-layer sky-moon"></div>
     <div class="sky-layer sky-vignette"></div>
   </div>
 
   <div id="app">
     <!-- Header -->
     <header class="header">
+      <div class="brand-name">GeauxWeather</div>
       <div class="location-row">
-        <button id="btn-loc" class="icon-btn" aria-label="Search location">📍</button>
+        <button id="btn-loc" class="icon-btn header-icon" aria-label="Search location">📍</button>
         <h1 id="loc-name" class="loc-name">—</h1>
-        <button id="btn-refresh" class="icon-btn" aria-label="Refresh">↻</button>
+        <button id="btn-refresh" class="icon-btn header-icon" aria-label="Refresh">↻</button>
       </div>
-      <div id="status" class="status"></div>
+      <div id="status" class="status" aria-live="polite"></div>
     </header>
 
     <!-- Screens -->
@@ -45,6 +48,16 @@
           <div id="temp-now" class="temp-now">—°</div>
           <div id="cond-now" class="cond-now">—</div>
           <div id="feels" class="feels">Feels —°</div>
+          <div class="sun-times" id="sun-times">
+            <div class="sun-time">
+              <span class="sun-label">Sunrise</span>
+              <span class="sun-value" id="sunrise-now">—</span>
+            </div>
+            <div class="sun-time">
+              <span class="sun-label">Sunset</span>
+              <span class="sun-value" id="sunset-now">—</span>
+            </div>
+          </div>
         </div>
         <div class="metrics" id="metrics-today"></div>
         <div class="hourly-wrap">
@@ -121,7 +134,7 @@
         </div>
         <p class="settings-hint muted small">Feedback opens email · Donate opens Liberapay</p>
         <div class="settings-group">
-          <p class="muted small" id="app-about">PureSky · v1.1.0 · GPL-3.0 · Open-Meteo · No tracking</p>
+          <p class="muted small" id="app-about">GeauxWeather · v1.0.0 · GPL-3.0 · Open-Meteo · No tracking</p>
         </div>
       </section>
     </main>

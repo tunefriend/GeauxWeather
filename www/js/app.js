@@ -6,7 +6,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.0.0';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -36,6 +36,7 @@
   /** Dynamic sky scenes behind the UI (Settings can disable → solid black) */
   let skyBgEnabled = localStorage.getItem('sky_bg') !== 'off';
   let lastWeatherCode = null;
+  let lastIsNight = false;
 
   function showScreen(name) {
     Object.keys(screens).forEach(function (k) {
@@ -70,7 +71,7 @@
     const about = document.getElementById('app-about');
     if (about) {
       about.textContent =
-        'PureSky · v' + APP_VERSION + ' · GPL-3.0 · Open-Meteo · No tracking';
+        'GeauxWeather · v' + APP_VERSION + ' · GPL-3.0 · Open-Meteo · No tracking';
     }
   }
   if (unitsSelect) {
@@ -86,7 +87,7 @@
     skyBgToggle.addEventListener('change', function () {
       skyBgEnabled = !!skyBgToggle.checked;
       localStorage.setItem('sky_bg', skyBgEnabled ? 'on' : 'off');
-      setSkyMood(lastWeatherCode);
+      setSkyMood(lastWeatherCode, lastIsNight);
     });
   }
 
@@ -140,9 +141,60 @@
     };
   }
 
-  function setSkyMood(weatherCode) {
+  function ensureStars() {
+    const el = document.getElementById('sky-stars');
+    if (!el || el.dataset.ready === '1') return;
+    const n = 48;
+    let html = '';
+    for (let i = 0; i < n; i++) {
+      const x = Math.random() * 100;
+      const y = Math.random() * 70;
+      const s = 1 + Math.random() * 2;
+      const d = 2 + Math.random() * 4;
+      const delay = Math.random() * 5;
+      html +=
+        '<span class="star" style="left:' +
+        x +
+        '%;top:' +
+        y +
+        '%;width:' +
+        s +
+        'px;height:' +
+        s +
+        'px;animation-duration:' +
+        d +
+        's;animation-delay:' +
+        delay +
+        's"></span>';
+    }
+    el.innerHTML = html;
+    el.dataset.ready = '1';
+  }
+
+  function isNightFromDaily(data) {
+    try {
+      const d = data && data.daily;
+      if (!d || !d.sunrise || !d.sunset) return false;
+      const rise = new Date(d.sunrise[0]).getTime();
+      const set = new Date(d.sunset[0]).getTime();
+      const now = Date.now();
+      if (!rise || !set || isNaN(rise) || isNaN(set)) return false;
+      return now < rise || now >= set;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setSkyMood(weatherCode, isNight) {
     if (weatherCode != null) lastWeatherCode = weatherCode;
-    const classes = ['sky-mood-sunny', 'sky-mood-cloudy', 'sky-mood-rain', 'sky-mood-default'];
+    if (typeof isNight === 'boolean') lastIsNight = isNight;
+    const classes = [
+      'sky-mood-sunny',
+      'sky-mood-cloudy',
+      'sky-mood-rain',
+      'sky-mood-night',
+      'sky-mood-default',
+    ];
     const sky = document.getElementById('sky-bg');
     const theme = document.querySelector('meta[name="theme-color"]');
 
@@ -159,10 +211,16 @@
     }
 
     if (sky) sky.classList.remove('sky-bg-off');
-    const mood =
+    let mood =
       W.codeToMood && typeof W.codeToMood === 'function'
         ? W.codeToMood(lastWeatherCode)
         : 'cloudy';
+    // Night sky with stars unless it's actively raining/storming
+    if (lastIsNight && mood !== 'rain') {
+      mood = 'night';
+      ensureStars();
+    }
+
     document.body.classList.remove.apply(document.body.classList, classes);
     document.body.classList.add('sky-mood-' + mood);
     if (sky) {
@@ -170,10 +228,13 @@
       sky.classList.add('sky-mood-' + mood);
     }
     if (theme) {
-      theme.setAttribute(
-        'content',
-        mood === 'sunny' ? '#2a5f8a' : mood === 'rain' ? '#151c28' : '#3a424e'
-      );
+      const colors = {
+        sunny: '#2a5f8a',
+        rain: '#151c28',
+        cloudy: '#3a424e',
+        night: '#0a0e18',
+      };
+      theme.setAttribute('content', colors[mood] || '#0b0f14');
     }
   }
 
@@ -183,12 +244,21 @@
     const deg = units === 'metric' ? '°C' : '°F';
     const windU = units === 'metric' ? 'km/h' : 'mph';
 
-    setSkyMood(c.weather_code);
+    const night = isNightFromDaily(data);
+    setSkyMood(c.weather_code, night);
 
     document.getElementById('temp-now').textContent = Math.round(c.temperature_2m) + '°';
     document.getElementById('cond-now').textContent = cond.icon + ' ' + cond.text;
     document.getElementById('feels').textContent =
       'Feels ' + Math.round(c.apparent_temperature) + deg;
+
+    // Sunrise / sunset for today
+    const riseEl = document.getElementById('sunrise-now');
+    const setEl = document.getElementById('sunset-now');
+    if (riseEl && setEl && data.daily) {
+      riseEl.textContent = formatTimeISO(data.daily.sunrise ? data.daily.sunrise[0] : null);
+      setEl.textContent = formatTimeISO(data.daily.sunset ? data.daily.sunset[0] : null);
+    }
 
     const metrics = [
       {
@@ -360,7 +430,7 @@
       const d = data.daily;
       const cond = W.codeToCondition(c.weather_code);
       const payload = JSON.stringify({
-        label: (loc && loc.label) || 'PureSky',
+        label: (loc && loc.label) || 'GeauxWeather',
         temp: Math.round(c.temperature_2m) + '°',
         condition: cond.icon + ' ' + cond.text,
         weatherCode: c.weather_code != null ? c.weather_code : -1,
@@ -369,7 +439,7 @@
         units: units,
         updatedAt: Date.now(),
       });
-      localStorage.setItem('puresky_widget', payload);
+      localStorage.setItem('geauxweather_widget', payload);
       try {
         if (
           window.Capacitor &&
@@ -379,7 +449,7 @@
           window.Capacitor.Plugins.Preferences
         ) {
           await window.Capacitor.Plugins.Preferences.set({
-            key: 'puresky_widget',
+            key: 'geauxweather_widget',
             value: payload,
           });
         }
@@ -391,10 +461,10 @@
         if (
           window.Capacitor &&
           window.Capacitor.Plugins &&
-          window.Capacitor.Plugins.PureSkyNative &&
-          typeof window.Capacitor.Plugins.PureSkyNative.refreshChrome === 'function'
+          window.Capacitor.Plugins.GeauxWeatherNative &&
+          typeof window.Capacitor.Plugins.GeauxWeatherNative.refreshChrome === 'function'
         ) {
-          await window.Capacitor.Plugins.PureSkyNative.refreshChrome();
+          await window.Capacitor.Plugins.GeauxWeatherNative.refreshChrome();
         }
       } catch (e) {
         console.warn('refreshChrome skipped', e);
@@ -501,7 +571,7 @@
         'Location denied or unavailable';
       setStatus(
         /denied|permission/i.test(String(msg))
-          ? 'Allow location in Settings → Apps → PureSky'
+          ? 'Allow location in Settings → Apps → GeauxWeather'
           : 'Location unavailable — try again or search a city',
         5000
       );
@@ -1027,9 +1097,9 @@
   if (btnFeedback) {
     btnFeedback.addEventListener('click', function (e) {
       e.preventDefault();
-      const subject = encodeURIComponent('PureSky feedback');
+      const subject = encodeURIComponent('GeauxWeather feedback');
       const body = encodeURIComponent(
-        'Hi PureSky team,\n\n' +
+        'Hi GeauxWeather team,\n\n' +
           'App version: ' + APP_VERSION + '\n' +
           'Device: ' +
           (navigator.userAgent || '') +
