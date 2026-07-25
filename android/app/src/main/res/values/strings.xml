@@ -4,4 +4,6 @@
     <string name="title_activity_main">PureSky</string>
     <string name="package_name">com.puresky.weather</string>
     <string name="custom_url_scheme">com.puresky.weather</string>
+    <string name="widget_name">PureSky</string>
+    <string name="widget_description">Current conditions and today\'s high/low</string>
 </resources>

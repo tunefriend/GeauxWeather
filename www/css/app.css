@@ -300,6 +300,26 @@ html, body {
   font-size: 0.95rem;
 }
 
+button.setting-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+button.setting-btn:last-child {
+  border-bottom: none;
+}
+button.setting-btn:active {
+  background: var(--surface-2);
+}
+.settings-hint {
+  padding: 4px 4px 12px !important;
+}
+
 .muted {
   color: var(--text-muted);
 }

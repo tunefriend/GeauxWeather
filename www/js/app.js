@@ -304,6 +304,7 @@
         label: (loc && loc.label) || 'PureSky',
         temp: Math.round(c.temperature_2m) + '°',
         condition: cond.icon + ' ' + cond.text,
+        weatherCode: c.weather_code != null ? c.weather_code : -1,
         high: d && d.temperature_2m_max ? Math.round(d.temperature_2m_max[0]) + '°' : '—°',
         low: d && d.temperature_2m_min ? Math.round(d.temperature_2m_min[0]) + '°' : '—°',
         units: units,
@@ -325,6 +326,19 @@
         }
       } catch (e) {
         console.warn('Preferences write skipped', e);
+      }
+      // Push to home/lock widgets + status notification
+      try {
+        if (
+          window.Capacitor &&
+          window.Capacitor.Plugins &&
+          window.Capacitor.Plugins.PureSkyNative &&
+          typeof window.Capacitor.Plugins.PureSkyNative.refreshChrome === 'function'
+        ) {
+          await window.Capacitor.Plugins.PureSkyNative.refreshChrome();
+        }
+      } catch (e) {
+        console.warn('refreshChrome skipped', e);
       }
     } catch (e) {
       console.warn('widget snapshot failed', e);
@@ -923,6 +937,57 @@
   if (btnRefresh) {
     btnRefresh.addEventListener('click', function () {
       refreshHome();
+    });
+  }
+
+  const DONATE_URL = 'https://liberapay.com/west66/donate';
+  const FEEDBACK_EMAIL = 'puresky.weather@proton.me';
+
+  function openExternalLink(url) {
+    try {
+      if (
+        window.Capacitor &&
+        window.Capacitor.isNativePlatform &&
+        window.Capacitor.isNativePlatform() &&
+        window.Capacitor.Plugins &&
+        window.Capacitor.Plugins.App &&
+        typeof window.Capacitor.Plugins.App.openUrl === 'function'
+      ) {
+        window.Capacitor.Plugins.App.openUrl({ url: url });
+        return;
+      }
+    } catch (_) {}
+    if (url.indexOf('mailto:') === 0) {
+      window.location.href = url;
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  const btnFeedback = document.getElementById('btn-feedback');
+  if (btnFeedback) {
+    btnFeedback.addEventListener('click', function (e) {
+      e.preventDefault();
+      const subject = encodeURIComponent('PureSky feedback');
+      const body = encodeURIComponent(
+        'Hi PureSky team,\n\n' +
+          'App version: 1.0.0\n' +
+          'Device: ' +
+          (navigator.userAgent || '') +
+          '\n\n' +
+          'Feedback:\n'
+      );
+      openExternalLink(
+        'mailto:' + FEEDBACK_EMAIL + '?subject=' + subject + '&body=' + body
+      );
+    });
+  }
+
+  const btnDonate = document.getElementById('btn-donate');
+  if (btnDonate) {
+    btnDonate.addEventListener('click', function (e) {
+      e.preventDefault();
+      openExternalLink(DONATE_URL);
     });
   }
 
