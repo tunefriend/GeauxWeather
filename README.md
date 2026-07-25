@@ -3,51 +3,44 @@
 Clean, fast, no-ads weather for Android.
 
 - **Stack**: Capacitor 7 + plain HTML/CSS/JS  
-- **Data**: Open-Meteo (no key) + RainViewer radar + OSM Nominatim  
+- **Data**: Open-Meteo (no API key) + RainViewer radar + OSM Nominatim  
 - **Package**: `com.puresky.weather`  
-- **License**: GPL-3.0-or-later  
+- **License**: [GPL-3.0-or-later](LICENSE)  
+
+## Download
+
+- **GitHub releases**: https://github.com/tunefriend/puresky/releases  
+- **GitLab**: https://gitlab.com/tunefriend/puresky  
+- F-Droid: pending inclusion MR to [fdroiddata](https://gitlab.com/fdroid/fdroiddata)
 
 ## Features
 
 - Today, hourly, and 10-day forecast  
 - Maps: rain radar timeline, wind/fog overlays  
-- Drop a pin on the map → nearest city name → save to Places  
-- Places tab: saved locations with temp + condition  
-- Long-press a place to set default; tap to open as home  
+- Drop a pin → nearest city name → save to Places  
+- Places tab with temp + condition; long-press sets default  
 - Header refresh: GPS when available, else default city  
-- Custom PureSky launcher icon  
-
-## Download APK
-
-**[puresky-1.0.0-debug.apk](https://github.com/tunefriend/puresky/releases/download/v1.0.0/puresky-1.0.0-debug.apk)** · [All releases](https://github.com/tunefriend/puresky/releases)
-
-```bash
-adb install -r puresky-1.0.0-debug.apk
-```
-
-Or open the APK on your phone (allow install from unknown sources if prompted).
-
-## Web preview
-
-Open `www/index.html` in a browser (network needed for weather + radar).
+- No ads, no tracking, no proprietary location SDKs  
 
 ## Build APK
 
 ```bash
-npm install
+npm ci
 npm run apk
-# or: bash scripts/build-apk.sh
-
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Requires Android SDK + JDK. First run may need `npx cap add android` only if `android/` is missing.
+Requires Android SDK + JDK 17+.
+
+## Privacy
+
+Location is used only on-device to fetch weather for your chosen place. Forecast data comes from Open-Meteo; map tiles from OpenStreetMap / RainViewer; reverse geocoding from Nominatim. No analytics SDKs.
 
 ## Project layout
 
 ```
 www/           web UI + brand assets
+android/       Capacitor Android project
+fastlane/      F-Droid / store metadata
 scripts/       build-apk.sh
-android/       Capacitor Android project (icons, permissions)
-native/        optional home-screen widget sources
 ```

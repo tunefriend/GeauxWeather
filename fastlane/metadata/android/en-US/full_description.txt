@@ -1,0 +1,11 @@
+PureSky is a free weather app with no ads and no tracking.
+
+Features:
+• Current conditions, hourly and 10-day forecast (Open-Meteo)
+• Rain radar map with timeline (RainViewer)
+• Drop a pin on the map — nearest city name, save to Places
+• Places list with temperature and sky condition
+• Long-press a place to set your default city
+• Refresh uses GPS when available, otherwise your default
+
+Data from Open-Meteo and OpenStreetMap. No account required.
