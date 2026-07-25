@@ -17,6 +17,16 @@ Clean, fast, no-ads weather for Android.
 - Header refresh: GPS when available, else default city  
 - Custom PureSky launcher icon  
 
+## Download APK
+
+**[puresky-1.0.0-debug.apk](https://github.com/tunefriend/puresky/releases/download/v1.0.0/puresky-1.0.0-debug.apk)** · [All releases](https://github.com/tunefriend/puresky/releases)
+
+```bash
+adb install -r puresky-1.0.0-debug.apk
+```
+
+Or open the APK on your phone (allow install from unknown sources if prompted).
+
 ## Web preview
 
 Open `www/index.html` in a browser (network needed for weather + radar).
