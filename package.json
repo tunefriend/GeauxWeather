@@ -1,0 +1,29 @@
+{
+  "name": "puresky",
+  "version": "1.0.0",
+  "description": "PureSky \u2014 clean, fast, no-ads weather for Android",
+  "main": "index.js",
+  "scripts": {
+    "sync": "npx cap sync android",
+    "open": "npx cap open android",
+    "android": "npx cap sync android && cd android && ./gradlew assembleDebug",
+    "apk": "bash scripts/build-apk.sh"
+  },
+  "keywords": [
+    "weather",
+    "capacitor",
+    "android",
+    "open-meteo"
+  ],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/geolocation": "^7.0.0",
+    "@capacitor/preferences": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

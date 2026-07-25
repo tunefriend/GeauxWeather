@@ -1,0 +1,25 @@
+node_modules/
+.idea/
+*.apk
+*.aab
+.DS_Store
+dist/
+.capacitor/
+*.log
+.local/
+
+# Android build outputs (keep sources)
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/captures/
+android/*.iml
+android/app/*.iml
+android/.idea/
+
+# OS / editor
+.vscode/
+*.swp
+*~

@@ -1,0 +1,13 @@
+{
+  "appId": "com.puresky.weather",
+  "appName": "PureSky",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": ["location"]
+    }
+  }
+}
