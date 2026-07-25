@@ -5,6 +5,8 @@
 (function () {
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
+  /** Keep in sync with android/app/build.gradle versionName */
+  const APP_VERSION = '1.1.0';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -31,6 +33,9 @@
   let homeFromGps = false;
   let searchMode = 'home'; // 'home' | 'addPlace'
   let placesRefreshing = false;
+  /** Dynamic sky scenes behind the UI (Settings can disable → solid black) */
+  let skyBgEnabled = localStorage.getItem('sky_bg') !== 'off';
+  let lastWeatherCode = null;
 
   function showScreen(name) {
     Object.keys(screens).forEach(function (k) {
@@ -60,6 +65,13 @@
 
   function loadPrefs() {
     if (unitsSelect) unitsSelect.value = units;
+    const skyToggle = document.getElementById('sky-bg-toggle');
+    if (skyToggle) skyToggle.checked = skyBgEnabled;
+    const about = document.getElementById('app-about');
+    if (about) {
+      about.textContent =
+        'PureSky · v' + APP_VERSION + ' · GPL-3.0 · Open-Meteo · No tracking';
+    }
   }
   if (unitsSelect) {
     unitsSelect.addEventListener('change', function () {
@@ -67,6 +79,14 @@
       localStorage.setItem('units', units);
       if (homeLoc) loadHomeWeather(homeLoc, true);
       refreshPlacesWeather(true);
+    });
+  }
+  const skyBgToggle = document.getElementById('sky-bg-toggle');
+  if (skyBgToggle) {
+    skyBgToggle.addEventListener('change', function () {
+      skyBgEnabled = !!skyBgToggle.checked;
+      localStorage.setItem('sky_bg', skyBgEnabled ? 'on' : 'off');
+      setSkyMood(lastWeatherCode);
     });
   }
 
@@ -120,11 +140,50 @@
     };
   }
 
+  function setSkyMood(weatherCode) {
+    if (weatherCode != null) lastWeatherCode = weatherCode;
+    const classes = ['sky-mood-sunny', 'sky-mood-cloudy', 'sky-mood-rain', 'sky-mood-default'];
+    const sky = document.getElementById('sky-bg');
+    const theme = document.querySelector('meta[name="theme-color"]');
+
+    if (!skyBgEnabled) {
+      document.body.classList.remove.apply(document.body.classList, classes);
+      document.body.classList.add('sky-mood-default');
+      if (sky) {
+        sky.classList.remove.apply(sky.classList, classes);
+        sky.classList.add('sky-mood-default');
+        sky.classList.add('sky-bg-off');
+      }
+      if (theme) theme.setAttribute('content', '#0b0f14');
+      return;
+    }
+
+    if (sky) sky.classList.remove('sky-bg-off');
+    const mood =
+      W.codeToMood && typeof W.codeToMood === 'function'
+        ? W.codeToMood(lastWeatherCode)
+        : 'cloudy';
+    document.body.classList.remove.apply(document.body.classList, classes);
+    document.body.classList.add('sky-mood-' + mood);
+    if (sky) {
+      sky.classList.remove.apply(sky.classList, classes);
+      sky.classList.add('sky-mood-' + mood);
+    }
+    if (theme) {
+      theme.setAttribute(
+        'content',
+        mood === 'sunny' ? '#2a5f8a' : mood === 'rain' ? '#151c28' : '#3a424e'
+      );
+    }
+  }
+
   function renderCurrent(data) {
     const c = data.current;
     const cond = W.codeToCondition(c.weather_code);
     const deg = units === 'metric' ? '°C' : '°F';
     const windU = units === 'metric' ? 'km/h' : 'mph';
+
+    setSkyMood(c.weather_code);
 
     document.getElementById('temp-now').textContent = Math.round(c.temperature_2m) + '°';
     document.getElementById('cond-now').textContent = cond.icon + ' ' + cond.text;
@@ -971,7 +1030,7 @@
       const subject = encodeURIComponent('PureSky feedback');
       const body = encodeURIComponent(
         'Hi PureSky team,\n\n' +
-          'App version: 1.0.0\n' +
+          'App version: ' + APP_VERSION + '\n' +
           'Device: ' +
           (navigator.userAgent || '') +
           '\n\n' +

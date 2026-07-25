@@ -11,7 +11,21 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
-<body>
+<body class="sky-mood-default">
+  <!-- Weather-driven sky backdrop -->
+  <div id="sky-bg" class="sky-bg sky-mood-default" aria-hidden="true">
+    <div class="sky-layer sky-gradient"></div>
+    <div class="sky-layer sky-sun"></div>
+    <div class="sky-layer sky-clouds">
+      <span class="cloud c1"></span>
+      <span class="cloud c2"></span>
+      <span class="cloud c3"></span>
+      <span class="cloud c4"></span>
+    </div>
+    <div class="sky-layer sky-rain"></div>
+    <div class="sky-layer sky-vignette"></div>
+  </div>
+
   <div id="app">
     <!-- Header -->
     <header class="header">
@@ -91,8 +105,8 @@
             </select>
           </label>
           <label class="setting-row">
-            <span>Theme</span>
-            <span class="muted">Dark (fixed)</span>
+            <span>Weather backgrounds</span>
+            <input type="checkbox" id="sky-bg-toggle" checked />
           </label>
         </div>
         <div class="settings-group">
@@ -107,7 +121,7 @@
         </div>
         <p class="settings-hint muted small">Feedback opens email · Donate opens Liberapay</p>
         <div class="settings-group">
-          <p class="muted small">PureSky · GPL-3.0 · Open-Meteo data · No tracking</p>
+          <p class="muted small" id="app-about">PureSky · v1.1.0 · GPL-3.0 · Open-Meteo · No tracking</p>
         </div>
       </section>
     </main>

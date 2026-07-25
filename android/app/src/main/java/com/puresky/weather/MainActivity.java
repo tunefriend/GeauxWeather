@@ -18,16 +18,15 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PureSkyNativePlugin.class);
         super.onCreate(savedInstanceState);
         requestNotifPermissionIfNeeded();
-        // Refresh chrome if a snapshot already exists
-        WeatherNotificationHelper.update(this);
         PureSkyWidgetProvider.refreshAll(this);
+        WeatherNotificationHelper.update(this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        WeatherNotificationHelper.update(this);
         PureSkyWidgetProvider.refreshAll(this);
+        WeatherNotificationHelper.update(this);
     }
 
     private void requestNotifPermissionIfNeeded() {

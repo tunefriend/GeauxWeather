@@ -99,9 +99,23 @@
     return miles >= 10 ? Math.round(miles) + ' mi' : miles.toFixed(1) + ' mi';
   }
 
+  /**
+   * Coarse sky mood for backgrounds + status chrome.
+   * @returns {'sunny'|'cloudy'|'rain'}
+   */
+  function codeToMood(code) {
+    const c = Number(code);
+    if (c === 0 || c === 1) return 'sunny'; // Clear / Mainly clear
+    // Rain, drizzle, showers, thunderstorms
+    if ((c >= 51 && c <= 67) || (c >= 80 && c <= 99)) return 'rain';
+    // Partly cloudy, overcast, fog, snow → cloudy scene
+    return 'cloudy';
+  }
+
   global.PureSkyWeather = {
     fetchForecast: fetchForecast,
     codeToCondition: codeToCondition,
+    codeToMood: codeToMood,
     windDir: windDir,
     formatVis: formatVis,
   };
