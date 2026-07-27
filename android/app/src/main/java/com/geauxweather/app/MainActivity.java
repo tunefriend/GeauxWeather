@@ -20,6 +20,10 @@ public class MainActivity extends BridgeActivity {
         requestNotifPermissionIfNeeded();
         GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
+        if (HurricaneAlertHelper.isEnabled(this)) {
+            HurricaneAlertHelper.schedule(this);
+            new Thread(() -> HurricaneAlertHelper.check(this, false)).start();
+        }
     }
 
     @Override
@@ -27,6 +31,9 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
+        if (HurricaneAlertHelper.isEnabled(this)) {
+            new Thread(() -> HurricaneAlertHelper.check(this, false)).start();
+        }
     }
 
     private void requestNotifPermissionIfNeeded() {

@@ -858,6 +858,8 @@
 
       const bounds = [];
       const names = [];
+      const geomJobs = [];
+
       for (let i = 0; i < storms.length; i++) {
         const s = storms[i];
         const lat = s.latitudeNumeric;
@@ -893,6 +895,10 @@
           s.publicAdvisory && s.publicAdvisory.url
             ? s.publicAdvisory.url
             : 'https://www.nhc.noaa.gov/';
+        const advNum =
+          (s.forecastTrack && s.forecastTrack.advNum) ||
+          (s.publicAdvisory && s.publicAdvisory.advNum) ||
+          '—';
 
         const html =
           '<div class="storm-popup-title">' +
@@ -905,7 +911,9 @@
           ' kt · ' +
           escapeHtml(String(s.pressure || '—')) +
           ' mb</div>' +
-          '<div class="storm-popup-meta">Moving ' +
+          '<div class="storm-popup-meta">Adv #' +
+          escapeHtml(String(advNum)) +
+          ' · Moving ' +
           escapeHtml(String(dir)) +
           ' at ' +
           escapeHtml(String(speed)) +
@@ -920,15 +928,31 @@
           escapeHtml(advisory) +
           '" target="_blank" rel="noopener">NHC advisory</a></div>';
 
-        const mk = L.marker([lat, lon], { icon: icon });
+        const mk = L.marker([lat, lon], { icon: icon, zIndexOffset: 500 });
         mk.bindPopup(html, { maxWidth: 260 });
         hurricaneLayerGroup.addLayer(mk);
 
-        // Past/forecast track line if we can fetch simple track points later —
-        // v1: optional dashed circle for ~34kt extent is skipped; markers only.
+        // Cone + forecast track + past (best) track from NHC KMZ
+        geomJobs.push(addStormGeometry(s, hurricaneLayerGroup, bounds));
       }
 
       hurricaneLayerGroup.addTo(m);
+
+      // Load geometry in parallel (don't block markers)
+      Promise.all(geomJobs).then(function () {
+        if (myId !== hurricaneFetchId || currentLayer !== 'hurricane') return;
+        if (bounds.length) {
+          try {
+            m.fitBounds(bounds, { padding: [40, 40], maxZoom: 6, animate: true });
+            userExploring = true;
+          } catch (e) {
+            /* ignore */
+          }
+        }
+        if (legend) {
+          legend.textContent = 'Cone · track · past path · NHC';
+        }
+      });
 
       if (bounds.length) {
         try {
@@ -947,9 +971,9 @@
           ' · ' +
           escapeHtml(names.join(', ')) +
           '</div>' +
-          '<p class="muted small">Tap a storm for details · NHC</p>';
+          '<p class="muted small">Cone + forecast track · tap storm · NHC</p>';
       }
-      if (legend) legend.textContent = 'Hurricane · NHC / NOAA';
+      if (legend) legend.textContent = 'Loading cone/track · NHC…';
     } catch (err) {
       console.warn('Hurricane load failed', err);
       if (info) {
@@ -959,6 +983,105 @@
       }
       if (legend) legend.textContent = 'Hurricane unavailable';
     }
+  }
+
+  /**
+   * Fetch NHC KMZ cone / forecast track / best (past) track and draw on map.
+   * Extends bounds[] with geometry points when present.
+   */
+  async function addStormGeometry(storm, layerGroup, bounds) {
+    if (!global.PureSkyKmz || typeof global.PureSkyKmz.fetchKmzGeometry !== 'function') {
+      return;
+    }
+    const jobs = [];
+
+    const coneUrl = storm.trackCone && storm.trackCone.kmzFile;
+    if (coneUrl) {
+      jobs.push(
+        global.PureSkyKmz.fetchKmzGeometry(coneUrl).then(function (geom) {
+          const polys = geom.polygons || [];
+          for (let i = 0; i < polys.length; i++) {
+            const poly = L.polygon(polys[i], {
+              color: '#f0c14a',
+              weight: 1.5,
+              opacity: 0.9,
+              fillColor: '#e8d24a',
+              fillOpacity: 0.22,
+              interactive: false,
+            });
+            layerGroup.addLayer(poly);
+            for (let j = 0; j < polys[i].length; j++) bounds.push(polys[i][j]);
+          }
+        }).catch(function (e) {
+          console.warn('Cone KMZ failed', storm.id, e);
+        })
+      );
+    }
+
+    const trackUrl = storm.forecastTrack && storm.forecastTrack.kmzFile;
+    if (trackUrl) {
+      jobs.push(
+        global.PureSkyKmz.fetchKmzGeometry(trackUrl).then(function (geom) {
+          const lines = geom.lines || [];
+          // Prefer longest line (full 5-day track)
+          lines.sort(function (a, b) {
+            return b.length - a.length;
+          });
+          for (let i = 0; i < lines.length; i++) {
+            const isMain = i === 0;
+            const line = L.polyline(lines[i], {
+              color: isMain ? '#1a1a1a' : '#333333',
+              weight: isMain ? 3 : 2,
+              opacity: isMain ? 0.9 : 0.55,
+              dashArray: isMain ? null : '4 6',
+              interactive: false,
+            });
+            layerGroup.addLayer(line);
+            for (let j = 0; j < lines[i].length; j++) bounds.push(lines[i][j]);
+            // Forecast points along main track
+            if (isMain) {
+              for (let j = 0; j < lines[i].length; j++) {
+                const pt = L.circleMarker(lines[i][j], {
+                  radius: j === 0 ? 5 : 3.5,
+                  color: '#0b0f14',
+                  weight: 1,
+                  fillColor: j === 0 ? '#e85d4c' : '#ffffff',
+                  fillOpacity: 1,
+                  interactive: false,
+                });
+                layerGroup.addLayer(pt);
+              }
+            }
+          }
+        }).catch(function (e) {
+          console.warn('Track KMZ failed', storm.id, e);
+        })
+      );
+    }
+
+    const pastUrl = storm.bestTrackGIS && storm.bestTrackGIS.kmzFile;
+    if (pastUrl) {
+      jobs.push(
+        global.PureSkyKmz.fetchKmzGeometry(pastUrl).then(function (geom) {
+          const lines = geom.lines || [];
+          for (let i = 0; i < lines.length; i++) {
+            const line = L.polyline(lines[i], {
+              color: '#5b9fd4',
+              weight: 2.5,
+              opacity: 0.85,
+              dashArray: '6 8',
+              interactive: false,
+            });
+            layerGroup.addLayer(line);
+            for (let j = 0; j < lines[i].length; j++) bounds.push(lines[i][j]);
+          }
+        }).catch(function (e) {
+          console.warn('Best track KMZ failed', storm.id, e);
+        })
+      );
+    }
+
+    await Promise.all(jobs);
   }
 
   function escapeHtml(str) {

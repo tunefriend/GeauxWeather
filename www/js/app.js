@@ -68,10 +68,14 @@
     if (unitsSelect) unitsSelect.value = units;
     const skyToggle = document.getElementById('sky-bg-toggle');
     if (skyToggle) skyToggle.checked = skyBgEnabled;
+    const hurToggle = document.getElementById('hurricane-alerts-toggle');
+    if (hurToggle) {
+      hurToggle.checked = localStorage.getItem('geauxweather_hurricane_alerts') === 'on';
+    }
     const about = document.getElementById('app-about');
     if (about) {
       about.textContent =
-        'GeauxWeather · v' + APP_VERSION + ' · GPL-3.0 · Open-Meteo · No tracking';
+        'GeauxWeather · v' + APP_VERSION + ' · GPL-3.0 · Open-Meteo · NHC · No tracking';
     }
   }
   if (unitsSelect) {

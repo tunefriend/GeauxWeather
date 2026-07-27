@@ -122,7 +122,14 @@
             <span>Weather backgrounds</span>
             <input type="checkbox" id="sky-bg-toggle" checked />
           </label>
+          <label class="setting-row">
+            <span>Hurricane alerts</span>
+            <input type="checkbox" id="hurricane-alerts-toggle" />
+          </label>
         </div>
+        <p class="settings-hint muted small" id="hurricane-alerts-hint">
+          Alerts when NHC issues a new storm or advisory (checks every few hours)
+        </p>
         <div class="settings-group">
           <button type="button" id="btn-feedback" class="setting-row setting-btn">
             <span>Send feedback</span>
@@ -181,8 +188,10 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="js/location.js"></script>
   <script src="js/weather.js"></script>
+  <script src="js/kmz.js"></script>
   <script src="js/maps.js"></script>
   <script src="js/cache.js"></script>
+  <script src="js/hurricane-alerts.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
