@@ -827,11 +827,19 @@
     }
 
     try {
-      const res = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json', {
-        cache: 'no-cache',
-      });
-      if (!res.ok) throw new Error('NHC ' + res.status);
-      const json = await res.json();
+      let json;
+      if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+        json = await global.PureSkyNet.fetch(
+          'https://www.nhc.noaa.gov/CurrentStorms.json',
+          { as: 'json' }
+        );
+      } else {
+        const res = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json', {
+          cache: 'no-cache',
+        });
+        if (!res.ok) throw new Error('NHC ' + res.status);
+        json = await res.json();
+      }
       if (myId !== hurricaneFetchId || currentLayer !== 'hurricane') return;
 
       const storms = json.activeStorms || [];
@@ -979,7 +987,10 @@
       if (info) {
         info.innerHTML =
           '<div class="map-info-title">Hurricane</div>' +
-          '<p class="muted">Could not load NHC data (offline?)</p>';
+          '<p class="muted">Could not load NHC data</p>' +
+          '<p class="muted small">' +
+          escapeHtml(String((err && err.message) || err || '')) +
+          '</p>';
       }
       if (legend) legend.textContent = 'Hurricane unavailable';
     }

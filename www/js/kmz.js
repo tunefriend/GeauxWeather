@@ -112,9 +112,14 @@
   }
 
   async function fetchKmzGeometry(url) {
-    const res = await fetch(url, { cache: 'no-cache' });
-    if (!res.ok) throw new Error('KMZ ' + res.status);
-    const ab = await res.arrayBuffer();
+    let ab;
+    if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+      ab = await global.PureSkyNet.fetch(url, { as: 'arrayBuffer' });
+    } else {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('KMZ ' + res.status);
+      ab = await res.arrayBuffer();
+    }
     const kml = await extractKml(ab);
     return parseKmlGeometry(kml);
   }

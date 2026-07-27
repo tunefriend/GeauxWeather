@@ -139,12 +139,20 @@
   }
 
   async function fetchStorms() {
-    const res = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json', {
-      cache: 'no-cache',
-    });
-    if (!res.ok) throw new Error('NHC ' + res.status);
-    const json = await res.json();
-    return json.activeStorms || [];
+    let json;
+    if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+      json = await global.PureSkyNet.fetch(
+        'https://www.nhc.noaa.gov/CurrentStorms.json',
+        { as: 'json' }
+      );
+    } else {
+      const res = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json', {
+        cache: 'no-cache',
+      });
+      if (!res.ok) throw new Error('NHC ' + res.status);
+      json = await res.json();
+    }
+    return (json && json.activeStorms) || [];
   }
 
   async function notifyNative(title, body, tag) {
