@@ -29,7 +29,8 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 - Today, hourly, 10-day forecast  
 - Maps: Rain, Wind, Fog, Hurricane (NHC cone + track), Tornado (NWS watches/warnings)  
-- Hurricane alerts (Settings toggle; NHC new storm / advisory notifications)  
+- Severe storm alerts (Settings): tornado, severe thunderstorm, nearby tropical for home/default location  
+
 
 - Places, GPS + default location  
 

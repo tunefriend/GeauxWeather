@@ -6,7 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-/** Background NHC poll for hurricane notifications. */
+/** Background poll for location-based severe storm notifications. */
 public class HurricaneAlertWorker extends Worker {
 
     public HurricaneAlertWorker(@NonNull Context context, @NonNull WorkerParameters params) {

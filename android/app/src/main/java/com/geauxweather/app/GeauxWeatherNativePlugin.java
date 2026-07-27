@@ -65,9 +65,9 @@ public class GeauxWeatherNativePlugin extends Plugin {
     @PluginMethod
     public void showHurricaneAlert(PluginCall call) {
         try {
-            String title = call.getString("title", "Hurricane alert");
+            String title = call.getString("title", "Severe weather");
             String body = call.getString("body", "");
-            String tag = call.getString("tag", "hurricane");
+            String tag = call.getString("tag", "severe");
             HurricaneAlertHelper.showAlert(getContext(), title, body, tag);
             call.resolve();
         } catch (Exception e) {
