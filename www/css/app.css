@@ -702,14 +702,16 @@ body.sky-mood-default {
 }
 
 .layer-btn {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 3.4rem;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-muted);
-  padding: 8px 6px;
+  padding: 8px 10px;
   border-radius: 10px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .layer-btn.active {
@@ -1208,13 +1210,115 @@ button.setting-btn:active {
   gap: 6px;
   margin-bottom: 8px;
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.map-toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .map-tool-btn {
   flex: 0 0 44px !important;
+  min-width: 44px !important;
   max-width: 48px;
   font-size: 1.1rem;
   padding: 8px 0 !important;
+}
+
+/* Wind arrows on map (Windfinder-style field) */
+.wind-arrow-icon {
+  background: transparent !important;
+  border: none !important;
+}
+.wind-arrow {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+.wind-arrow svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.wind-legend-scale {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.wind-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.wind-legend-swatch i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Hurricane markers */
+.storm-marker-icon {
+  background: transparent !important;
+  border: none !important;
+}
+.storm-marker {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  background: rgba(12, 18, 28, 0.75);
+  border: 2px solid #5b9fd4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.storm-marker.cat-ts {
+  border-color: #f0c14a;
+}
+.storm-marker.cat-hu {
+  border-color: #e85d4c;
+  background: rgba(80, 20, 20, 0.8);
+}
+.storm-marker.cat-mh {
+  border-color: #c44dff;
+  background: rgba(50, 10, 60, 0.85);
+}
+.leaflet-popup-content-wrapper {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.leaflet-popup-tip {
+  background: var(--surface);
+}
+.leaflet-popup-content {
+  margin: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.storm-popup-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+.storm-popup-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.storm-popup a {
+  color: var(--accent);
 }
 
 .map-container {

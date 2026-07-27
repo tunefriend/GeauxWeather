@@ -28,7 +28,9 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ## Features
 
 - Today, hourly, 10-day forecast  
-- Maps / radar, Places, GPS + default location  
+- Maps: Rain (radar), Wind field (arrows + particles), Fog, Hurricane (NHC)  
+- Places, GPS + default location  
+
 - Weather backgrounds (day/night) with Settings toggle  
 - Home widget + status-bar temperature  
 - Feedback + Liberapay donate  

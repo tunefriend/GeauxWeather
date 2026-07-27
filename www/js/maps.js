@@ -1,5 +1,7 @@
 /**
  * maps.js — Leaflet + OSM + RainViewer radar
+ * Wind field (Open-Meteo grid arrows + particles)
+ * Hurricane (NHC CurrentStorms)
  * Timeline play/pause + scrubber + smooth crossfade
  * Drop-pin to pick location; view is not force-reset while exploring
  */
@@ -24,11 +26,24 @@
   let userExploring = false;
   let pinDropHandler = null;
 
+  // Wind field
+  let windLayerGroup = null;
+  let windParticleLayer = null;
+  let windFetchTimer = null;
+  let windMoveHandler = null;
+  let windFetchId = 0;
+
+  // Hurricane
+  let hurricaneLayerGroup = null;
+  let hurricaneFetchId = 0;
+
   // RainViewer free tiles support zoom 0–7 only (higher shows "Zoom Level Not Supported")
   const RADAR_MAX_ZOOM = 7;
   const DEFAULT_ZOOM = 6;
   const PLAY_MS = 1400;
   const FADE_MS = 450;
+  const WIND_GRID = 7; // 7×7 = 49 points
+  const WIND_DEBOUNCE_MS = 450;
 
   function $(id) {
     return document.getElementById(id);
@@ -159,8 +174,10 @@
 
   function setForecast(data) {
     lastForecast = data;
-    if (currentLayer === 'wind' || currentLayer === 'fog') {
-      showDataOverlay(currentLayer);
+    if (currentLayer === 'fog') {
+      showDataOverlay('fog');
+    } else if (currentLayer === 'wind') {
+      updateWindPinLegend();
     }
   }
 
@@ -235,11 +252,13 @@
       timeEl.textContent = '—';
     }
 
-    const legend = $('map-legend');
-    if (legend) {
-      legend.textContent = playing
-        ? 'Playing radar · RainViewer'
-        : 'Tap map to pin · RainViewer';
+    if (currentLayer === 'radar') {
+      const legend = $('map-legend');
+      if (legend) {
+        legend.textContent = playing
+          ? 'Playing radar · RainViewer'
+          : 'Tap map to pin · RainViewer';
+      }
     }
   }
 
@@ -410,6 +429,548 @@
     }
   }
 
+  // ─── Wind field (Open-Meteo grid + particles) ───────────────────────────
+
+  function windColor(speedMph) {
+    if (speedMph < 5) return '#7ec8e3';
+    if (speedMph < 10) return '#5b9fd4';
+    if (speedMph < 15) return '#3dcc8c';
+    if (speedMph < 25) return '#f0c14a';
+    if (speedMph < 35) return '#e89a3c';
+    if (speedMph < 50) return '#e85d4c';
+    return '#c44dff';
+  }
+
+  /** Meteorological from-direction deg → CSS rotation so arrow points where wind goes */
+  function windToCssDeg(fromDeg) {
+    // Wind FROM direction: blow toward fromDeg + 180. SVG arrow points up (0 = north).
+    return ((fromDeg + 180) % 360 + 360) % 360;
+  }
+
+  function sampleWindGrid(bounds) {
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const south = bounds.getSouth();
+    const north = bounds.getNorth();
+    const n = WIND_GRID;
+    const lats = [];
+    const lons = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        lats.push(south + ((north - south) * (i + 0.5)) / n);
+        lons.push(west + ((east - west) * (j + 0.5)) / n);
+      }
+    }
+    return { lats: lats, lons: lons };
+  }
+
+  function clearWind() {
+    windFetchId++;
+    if (windFetchTimer) {
+      clearTimeout(windFetchTimer);
+      windFetchTimer = null;
+    }
+    if (map && windMoveHandler) {
+      map.off('moveend', windMoveHandler);
+      windMoveHandler = null;
+    }
+    if (windParticleLayer && map) {
+      map.removeLayer(windParticleLayer);
+      windParticleLayer = null;
+    }
+    if (windLayerGroup && map) {
+      map.removeLayer(windLayerGroup);
+      windLayerGroup = null;
+    }
+  }
+
+  function scheduleWindRefresh() {
+    if (windFetchTimer) clearTimeout(windFetchTimer);
+    windFetchTimer = setTimeout(function () {
+      windFetchTimer = null;
+      if (currentLayer === 'wind') loadWindField();
+    }, WIND_DEBOUNCE_MS);
+  }
+
+  function wireWindMove() {
+    if (!map || windMoveHandler) return;
+    windMoveHandler = function () {
+      if (currentLayer === 'wind') scheduleWindRefresh();
+    };
+    map.on('moveend', windMoveHandler);
+  }
+
+  function makeWindArrowIcon(speedMph, fromDeg) {
+    const color = windColor(speedMph);
+    const rot = windToCssDeg(fromDeg);
+    // Arrow points up; CSS rotates to wind-to direction
+    const html =
+      '<div class="wind-arrow" style="transform:rotate(' +
+      rot +
+      'deg)">' +
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M12 3 L12 18" stroke="' +
+      color +
+      '" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<path d="M12 3 L7.5 9.5 M12 3 L16.5 9.5" stroke="' +
+      color +
+      '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="12" cy="19.5" r="1.6" fill="' +
+      color +
+      '"/>' +
+      '</svg></div>';
+    return L.divIcon({
+      className: 'wind-arrow-icon',
+      html: html,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
+
+  /**
+   * Lightweight canvas particle flow (Windfinder-style) using same grid samples.
+   */
+  function createWindParticleLayer(samples) {
+    if (typeof L === 'undefined') return null;
+
+    const ParticleLayer = L.Layer.extend({
+      initialize: function (pts) {
+        this._pts = pts || [];
+        this._particles = [];
+        this._raf = null;
+      },
+      onAdd: function (m) {
+        this._map = m;
+        const size = m.getSize();
+        this._canvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated');
+        this._canvas.width = size.x;
+        this._canvas.height = size.y;
+        this._canvas.style.pointerEvents = 'none';
+        this._canvas.style.position = 'absolute';
+        this._canvas.style.left = '0';
+        this._canvas.style.top = '0';
+        this._canvas.style.zIndex = '350';
+        const pane = m.getPanes().overlayPane;
+        pane.appendChild(this._canvas);
+        this._reset();
+        this._spawn(Math.min(220, 80 + this._pts.length * 3));
+        const self = this;
+        this._onMove = function () {
+          self._reset();
+        };
+        m.on('moveend zoomend resize', this._onMove);
+        this._running = true;
+        this._loop();
+      },
+      onRemove: function (m) {
+        this._running = false;
+        if (this._raf) cancelAnimationFrame(this._raf);
+        if (this._canvas && this._canvas.parentNode) {
+          this._canvas.parentNode.removeChild(this._canvas);
+        }
+        if (this._onMove) m.off('moveend zoomend resize', this._onMove);
+        this._canvas = null;
+        this._particles = [];
+      },
+      setSamples: function (pts) {
+        this._pts = pts || [];
+      },
+      _reset: function () {
+        if (!this._map || !this._canvas) return;
+        const size = this._map.getSize();
+        const topLeft = this._map.containerPointToLayerPoint([0, 0]);
+        L.DomUtil.setPosition(this._canvas, topLeft);
+        if (this._canvas.width !== size.x || this._canvas.height !== size.y) {
+          this._canvas.width = size.x;
+          this._canvas.height = size.y;
+        }
+      },
+      _nearest: function (lat, lon) {
+        let best = null;
+        let bestD = Infinity;
+        for (let i = 0; i < this._pts.length; i++) {
+          const p = this._pts[i];
+          const d = (p.lat - lat) * (p.lat - lat) + (p.lon - lon) * (p.lon - lon);
+          if (d < bestD) {
+            bestD = d;
+            best = p;
+          }
+        }
+        return best;
+      },
+      _spawn: function (n) {
+        if (!this._map) return;
+        const b = this._map.getBounds();
+        this._particles = [];
+        for (let i = 0; i < n; i++) {
+          this._particles.push({
+            lat: b.getSouth() + Math.random() * (b.getNorth() - b.getSouth()),
+            lon: b.getWest() + Math.random() * (b.getEast() - b.getWest()),
+            age: Math.random() * 80,
+            life: 50 + Math.random() * 70,
+          });
+        }
+      },
+      _loop: function () {
+        const self = this;
+        if (!this._running || !this._canvas || !this._map) return;
+        const ctx = this._canvas.getContext('2d');
+        const w = this._canvas.width;
+        const h = this._canvas.height;
+        // Trail fade
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'source-over';
+
+        const b = this._map.getBounds();
+        for (let i = 0; i < this._particles.length; i++) {
+          const p = this._particles[i];
+          p.age++;
+          if (p.age > p.life || !b.contains([p.lat, p.lon])) {
+            p.lat = b.getSouth() + Math.random() * (b.getNorth() - b.getSouth());
+            p.lon = b.getWest() + Math.random() * (b.getEast() - b.getWest());
+            p.age = 0;
+            p.life = 50 + Math.random() * 70;
+          }
+          const near = this._nearest(p.lat, p.lon);
+          if (!near) continue;
+          // Move with wind (toward direction)
+          const toRad = ((near.dir + 180) * Math.PI) / 180;
+          const speed = Math.max(0.2, near.speedMph);
+          // degrees per frame scaled by zoom
+          const zoom = this._map.getZoom();
+          const scale = (0.00035 * speed) / Math.max(1, zoom / 4);
+          p.lat += Math.cos(toRad) * scale;
+          p.lon += Math.sin(toRad) * scale;
+
+          const pt = this._map.latLngToContainerPoint([p.lat, p.lon]);
+          const alpha = Math.max(0.15, 1 - p.age / p.life);
+          ctx.beginPath();
+          ctx.fillStyle = windColor(near.speedMph);
+          ctx.globalAlpha = alpha * 0.85;
+          ctx.arc(pt.x, pt.y, 1.4 + Math.min(2.2, speed / 20), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        this._raf = requestAnimationFrame(function () {
+          self._loop();
+        });
+      },
+    });
+
+    return new ParticleLayer(samples);
+  }
+
+  async function loadWindField() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'wind') return;
+    const myId = ++windFetchId;
+    const legend = $('map-legend');
+    if (legend) legend.textContent = 'Loading wind…';
+
+    try {
+      const bounds = m.getBounds().pad(0.05);
+      const grid = sampleWindGrid(bounds);
+      const url =
+        'https://api.open-meteo.com/v1/forecast?' +
+        'latitude=' +
+        grid.lats.join(',') +
+        '&longitude=' +
+        grid.lons.join(',') +
+        '&current=wind_speed_10m,wind_direction_10m' +
+        '&wind_speed_unit=mph';
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Open-Meteo ' + res.status);
+      let data = await res.json();
+      if (!Array.isArray(data)) data = [data];
+
+      const samples = [];
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const c = row.current || {};
+        const lat = row.latitude != null ? row.latitude : grid.lats[i];
+        const lon = row.longitude != null ? row.longitude : grid.lons[i];
+        const speed = c.wind_speed_10m != null ? c.wind_speed_10m : 0;
+        const dir = c.wind_direction_10m != null ? c.wind_direction_10m : 0;
+        samples.push({ lat: lat, lon: lon, speedMph: speed, dir: dir });
+      }
+
+      if (myId !== windFetchId || currentLayer !== 'wind') return;
+
+      if (windLayerGroup) {
+        m.removeLayer(windLayerGroup);
+        windLayerGroup = null;
+      }
+      windLayerGroup = L.layerGroup();
+      for (let i = 0; i < samples.length; i++) {
+        const s = samples[i];
+        const mk = L.marker([s.lat, s.lon], {
+          icon: makeWindArrowIcon(s.speedMph, s.dir),
+          interactive: false,
+          keyboard: false,
+        });
+        windLayerGroup.addLayer(mk);
+      }
+      windLayerGroup.addTo(m);
+
+      if (windParticleLayer) {
+        m.removeLayer(windParticleLayer);
+        windParticleLayer = null;
+      }
+      windParticleLayer = createWindParticleLayer(samples);
+      if (windParticleLayer) windParticleLayer.addTo(m);
+
+      updateWindPinLegend();
+      if (legend) {
+        legend.innerHTML =
+          'Wind · Open-Meteo · ' +
+          '<span class="wind-legend-scale">' +
+          swatch('#7ec8e3', '<5') +
+          swatch('#5b9fd4', '10') +
+          swatch('#3dcc8c', '15') +
+          swatch('#f0c14a', '25') +
+          swatch('#e85d4c', '35+') +
+          ' mph</span>';
+      }
+    } catch (err) {
+      console.warn('Wind field failed', err);
+      if (myId !== windFetchId) return;
+      if (legend) legend.textContent = 'Wind unavailable (offline?)';
+      showDataOverlay('wind');
+    }
+  }
+
+  function swatch(color, label) {
+    return (
+      '<span class="wind-legend-swatch"><i style="background:' +
+      color +
+      '"></i>' +
+      label +
+      '</span>'
+    );
+  }
+
+  function updateWindPinLegend() {
+    const el = $('map-info');
+    if (!el) return;
+    if (!lastForecast || !lastForecast.current) {
+      el.classList.add('hidden');
+      return;
+    }
+    const c = lastForecast.current;
+    const units = localStorage.getItem('units') || 'imperial';
+    const windU = units === 'metric' ? 'km/h' : 'mph';
+    // Forecast already in user units; map wind is always mph — convert for display if metric
+    let speed = c.wind_speed_10m;
+    // pin uses forecast units already from Open-Meteo fetch in weather.js
+    const dir = global.PureSkyWeather
+      ? global.PureSkyWeather.windDir(c.wind_direction_10m)
+      : '';
+    el.classList.remove('hidden');
+    el.innerHTML =
+      '<div class="map-info-title">Wind at pin</div>' +
+      '<div class="map-info-value">' +
+      Math.round(speed) +
+      ' ' +
+      windU +
+      ' ' +
+      dir +
+      '</div>' +
+      '<p class="muted small">Arrows show field · particles show flow</p>';
+  }
+
+  // ─── Hurricane (NHC) ────────────────────────────────────────────────────
+
+  function stormCategory(classification, intensityKt) {
+    const cls = (classification || '').toUpperCase();
+    const kt = parseInt(intensityKt, 10) || 0;
+    if (cls === 'HU' || cls === 'MH') {
+      if (kt >= 137) return { label: 'Cat 5 Hurricane', css: 'cat-mh', emoji: '🌀' };
+      if (kt >= 113) return { label: 'Cat 4 Hurricane', css: 'cat-mh', emoji: '🌀' };
+      if (kt >= 96) return { label: 'Cat 3 Hurricane', css: 'cat-hu', emoji: '🌀' };
+      if (kt >= 83) return { label: 'Cat 2 Hurricane', css: 'cat-hu', emoji: '🌀' };
+      if (kt >= 64) return { label: 'Cat 1 Hurricane', css: 'cat-hu', emoji: '🌀' };
+      return { label: 'Hurricane', css: 'cat-hu', emoji: '🌀' };
+    }
+    if (cls === 'TS' || kt >= 34) {
+      return { label: 'Tropical Storm', css: 'cat-ts', emoji: '🌧' };
+    }
+    if (cls === 'TD' || cls === 'SD' || cls === 'SS') {
+      return { label: 'Tropical Depression', css: '', emoji: '☁' };
+    }
+    if (cls === 'PTC' || cls === 'PC') {
+      return { label: 'Post-Tropical', css: '', emoji: '🌫' };
+    }
+    return { label: classification || 'Storm', css: '', emoji: '🌀' };
+  }
+
+  function clearHurricane() {
+    hurricaneFetchId++;
+    if (hurricaneLayerGroup && map) {
+      map.removeLayer(hurricaneLayerGroup);
+      hurricaneLayerGroup = null;
+    }
+  }
+
+  async function loadHurricanes() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'hurricane') return;
+    const myId = ++hurricaneFetchId;
+    const legend = $('map-legend');
+    const info = $('map-info');
+    if (legend) legend.textContent = 'Loading storms · NHC…';
+    if (info) {
+      info.classList.remove('hidden');
+      info.innerHTML = '<p class="muted">Fetching active tropical cyclones…</p>';
+    }
+
+    try {
+      const res = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json', {
+        cache: 'no-cache',
+      });
+      if (!res.ok) throw new Error('NHC ' + res.status);
+      const json = await res.json();
+      if (myId !== hurricaneFetchId || currentLayer !== 'hurricane') return;
+
+      const storms = json.activeStorms || [];
+      if (hurricaneLayerGroup && m) {
+        m.removeLayer(hurricaneLayerGroup);
+        hurricaneLayerGroup = null;
+      }
+      hurricaneLayerGroup = L.layerGroup();
+
+      if (!storms.length) {
+        if (info) {
+          info.innerHTML =
+            '<div class="map-info-title">Active storms</div>' +
+            '<div class="map-info-value" style="font-size:1.05rem">None right now</div>' +
+            '<p class="muted small">No tropical cyclones in NHC advisories</p>';
+        }
+        if (legend) legend.textContent = 'Hurricane · NHC · All clear';
+        // Wide Atlantic/EP view for context
+        if (!userExploring) {
+          m.setView([20, -70], 3, { animate: true });
+        }
+        return;
+      }
+
+      const bounds = [];
+      const names = [];
+      for (let i = 0; i < storms.length; i++) {
+        const s = storms[i];
+        const lat = s.latitudeNumeric;
+        const lon = s.longitudeNumeric;
+        if (lat == null || lon == null) continue;
+        const cat = stormCategory(s.classification, s.intensity);
+        names.push(s.name || s.id);
+        bounds.push([lat, lon]);
+
+        const icon = L.divIcon({
+          className: 'storm-marker-icon',
+          html:
+            '<div class="storm-marker ' +
+            cat.css +
+            '" title="' +
+            (s.name || '') +
+            '">' +
+            cat.emoji +
+            '</div>',
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
+        });
+
+        const dir =
+          s.movementDir != null
+            ? global.PureSkyWeather
+              ? global.PureSkyWeather.windDir(s.movementDir)
+              : s.movementDir + '°'
+            : '—';
+        const speed =
+          s.movementSpeed != null ? s.movementSpeed + ' kt' : '—';
+        const advisory =
+          s.publicAdvisory && s.publicAdvisory.url
+            ? s.publicAdvisory.url
+            : 'https://www.nhc.noaa.gov/';
+
+        const html =
+          '<div class="storm-popup-title">' +
+          escapeHtml(cat.emoji + ' ' + (s.name || s.id)) +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(cat.label) +
+          ' · ' +
+          escapeHtml(String(s.intensity || '—')) +
+          ' kt · ' +
+          escapeHtml(String(s.pressure || '—')) +
+          ' mb</div>' +
+          '<div class="storm-popup-meta">Moving ' +
+          escapeHtml(String(dir)) +
+          ' at ' +
+          escapeHtml(String(speed)) +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(s.latitude || '') +
+          ' ' +
+          escapeHtml(s.longitude || '') +
+          '</div>' +
+          '<div class="storm-popup-meta" style="margin-top:6px">' +
+          '<a href="' +
+          escapeHtml(advisory) +
+          '" target="_blank" rel="noopener">NHC advisory</a></div>';
+
+        const mk = L.marker([lat, lon], { icon: icon });
+        mk.bindPopup(html, { maxWidth: 260 });
+        hurricaneLayerGroup.addLayer(mk);
+
+        // Past/forecast track line if we can fetch simple track points later —
+        // v1: optional dashed circle for ~34kt extent is skipped; markers only.
+      }
+
+      hurricaneLayerGroup.addTo(m);
+
+      if (bounds.length) {
+        try {
+          m.fitBounds(bounds, { padding: [48, 48], maxZoom: 6, animate: true });
+          userExploring = true;
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Active storms</div>' +
+          '<div class="map-info-value" style="font-size:1.05rem">' +
+          storms.length +
+          ' · ' +
+          escapeHtml(names.join(', ')) +
+          '</div>' +
+          '<p class="muted small">Tap a storm for details · NHC</p>';
+      }
+      if (legend) legend.textContent = 'Hurricane · NHC / NOAA';
+    } catch (err) {
+      console.warn('Hurricane load failed', err);
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Hurricane</div>' +
+          '<p class="muted">Could not load NHC data (offline?)</p>';
+      }
+      if (legend) legend.textContent = 'Hurricane unavailable';
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ─── Fog / generic overlay ──────────────────────────────────────────────
+
   function showDataOverlay(kind) {
     const el = $('map-info');
     if (!el) return;
@@ -464,17 +1025,21 @@
     ensureMap();
     wireControls();
 
-    document.querySelectorAll('.layer-btn').forEach(function (btn) {
+    document.querySelectorAll('.layer-btn[data-layer]').forEach(function (btn) {
       btn.classList.toggle(
         'active',
         btn.getAttribute('data-layer') === currentLayer
       );
     });
 
+    // Tear down non-active overlays
+    if (currentLayer !== 'radar') clearRadar();
+    if (currentLayer !== 'wind') clearWind();
+    if (currentLayer !== 'hurricane') clearHurricane();
+
     if (currentLayer === 'radar') {
       hideDataOverlay();
       setControlsVisible(true);
-      // Radar tiles only exist up to z7 (maxNativeZoom); higher zooms scale tiles up
       if (!radarFrames.length) {
         loadRadarFrames();
       } else {
@@ -484,8 +1049,15 @@
           radarFront.addTo(map);
         }
       }
+    } else if (currentLayer === 'wind') {
+      setControlsVisible(false);
+      wireWindMove();
+      loadWindField();
+    } else if (currentLayer === 'hurricane') {
+      setControlsVisible(false);
+      loadHurricanes();
     } else {
-      clearRadar();
+      // fog
       setControlsVisible(false);
       showDataOverlay(currentLayer);
     }
