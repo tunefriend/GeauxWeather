@@ -37,6 +37,10 @@
   let hurricaneLayerGroup = null;
   let hurricaneFetchId = 0;
 
+  // Tornado / severe (NWS alerts)
+  let tornadoLayerGroup = null;
+  let tornadoFetchId = 0;
+
   // RainViewer free tiles support zoom 0–7 only (higher shows "Zoom Level Not Supported")
   const RADAR_MAX_ZOOM = 7;
   const DEFAULT_ZOOM = 6;
@@ -1103,6 +1107,277 @@
       .replace(/"/g, '&quot;');
   }
 
+  // ─── Tornado / severe weather (NWS api.weather.gov) ─────────────────────
+
+  const TORNADO_EVENTS = [
+    'Tornado Warning',
+    'Tornado Watch',
+    'Tornado Emergency',
+    'Severe Thunderstorm Warning',
+    'Severe Thunderstorm Watch',
+  ];
+
+  function tornadoStyle(eventName) {
+    const e = (eventName || '').toLowerCase();
+    if (e.indexOf('tornado emergency') >= 0) {
+      return { color: '#c44dff', fillColor: '#9b2dff', fillOpacity: 0.35, weight: 2.5 };
+    }
+    if (e.indexOf('tornado warning') >= 0) {
+      return { color: '#e85d4c', fillColor: '#e85d4c', fillOpacity: 0.32, weight: 2.5 };
+    }
+    if (e.indexOf('tornado watch') >= 0) {
+      return { color: '#f0c14a', fillColor: '#f0c14a', fillOpacity: 0.2, weight: 2 };
+    }
+    if (e.indexOf('severe thunderstorm warning') >= 0) {
+      return { color: '#e89a3c', fillColor: '#e89a3c', fillOpacity: 0.22, weight: 2 };
+    }
+    if (e.indexOf('severe thunderstorm watch') >= 0) {
+      return { color: '#5b9fd4', fillColor: '#5b9fd4', fillOpacity: 0.14, weight: 1.5 };
+    }
+    return { color: '#888', fillColor: '#888', fillOpacity: 0.15, weight: 1.5 };
+  }
+
+  function clearTornado() {
+    tornadoFetchId++;
+    if (tornadoLayerGroup && map) {
+      map.removeLayer(tornadoLayerGroup);
+      tornadoLayerGroup = null;
+    }
+  }
+
+  /** GeoJSON lon/lat rings → Leaflet [lat,lon] rings */
+  function geoJsonToLatLngs(coords, type) {
+    if (!coords) return [];
+    if (type === 'Polygon') {
+      return coords.map(function (ring) {
+        return ring.map(function (c) {
+          return [c[1], c[0]];
+        });
+      });
+    }
+    if (type === 'MultiPolygon') {
+      // Flatten to list of polygons (each is array of rings)
+      return coords.map(function (poly) {
+        return poly.map(function (ring) {
+          return ring.map(function (c) {
+            return [c[1], c[0]];
+          });
+        });
+      });
+    }
+    if (type === 'Point') {
+      return [[coords[1], coords[0]]];
+    }
+    return [];
+  }
+
+  function formatAlertTime(iso) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  async function loadTornadoes() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'tornado') return;
+    const myId = ++tornadoFetchId;
+    const legend = $('map-legend');
+    const info = $('map-info');
+    if (legend) legend.textContent = 'Loading alerts · NWS…';
+    if (info) {
+      info.classList.remove('hidden');
+      info.innerHTML = '<p class="muted">Fetching tornado &amp; severe alerts…</p>';
+    }
+
+    try {
+      // NWS free GeoJSON; User-Agent required — native bridge sets it
+      const eventQ = TORNADO_EVENTS.map(encodeURIComponent).join(',');
+      const url =
+        'https://api.weather.gov/alerts/active?event=' +
+        eventQ +
+        '&status=actual';
+
+      let geo;
+      if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+        geo = await global.PureSkyNet.fetch(url, { as: 'json' });
+      } else {
+        const res = await fetch(url, {
+          cache: 'no-cache',
+          headers: {
+            Accept: 'application/geo+json',
+            'User-Agent': 'GeauxWeather/1.0 (FOSS weather app)',
+          },
+        });
+        if (!res.ok) throw new Error('NWS ' + res.status);
+        geo = await res.json();
+      }
+
+      if (myId !== tornadoFetchId || currentLayer !== 'tornado') return;
+
+      if (tornadoLayerGroup && m) {
+        m.removeLayer(tornadoLayerGroup);
+        tornadoLayerGroup = null;
+      }
+      tornadoLayerGroup = L.layerGroup();
+
+      const features = (geo && geo.features) || [];
+      const bounds = [];
+      const counts = {
+        torWarn: 0,
+        torWatch: 0,
+        torEmerg: 0,
+        svrWarn: 0,
+        svrWatch: 0,
+      };
+
+      for (let i = 0; i < features.length; i++) {
+        const f = features[i];
+        const props = f.properties || {};
+        const eventName = props.event || 'Alert';
+        const el = eventName.toLowerCase();
+        if (el.indexOf('tornado emergency') >= 0) counts.torEmerg++;
+        else if (el.indexOf('tornado warning') >= 0) counts.torWarn++;
+        else if (el.indexOf('tornado watch') >= 0) counts.torWatch++;
+        else if (el.indexOf('severe thunderstorm warning') >= 0) counts.svrWarn++;
+        else if (el.indexOf('severe thunderstorm watch') >= 0) counts.svrWatch++;
+
+        const style = tornadoStyle(eventName);
+        const geom = f.geometry;
+        if (!geom) continue;
+
+        const headline = props.headline || eventName;
+        const area = props.areaDesc || '';
+        const ends = formatAlertTime(props.ends || props.expires);
+        const severity = props.severity || '';
+        const popup =
+          '<div class="storm-popup-title">' +
+          escapeHtml(eventName) +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(area) +
+          '</div>' +
+          (severity
+            ? '<div class="storm-popup-meta">' + escapeHtml(severity) + '</div>'
+            : '') +
+          '<div class="storm-popup-meta">Until ' +
+          escapeHtml(ends) +
+          '</div>' +
+          (headline
+            ? '<div class="storm-popup-meta" style="margin-top:6px">' +
+              escapeHtml(headline) +
+              '</div>'
+            : '');
+
+        if (geom.type === 'Polygon') {
+          const rings = geoJsonToLatLngs(geom.coordinates, 'Polygon');
+          if (!rings.length) continue;
+          const poly = L.polygon(rings, style);
+          poly.bindPopup(popup, { maxWidth: 280 });
+          tornadoLayerGroup.addLayer(poly);
+          rings[0].forEach(function (ll) {
+            bounds.push(ll);
+          });
+        } else if (geom.type === 'MultiPolygon') {
+          const polys = geoJsonToLatLngs(geom.coordinates, 'MultiPolygon');
+          for (let p = 0; p < polys.length; p++) {
+            const poly = L.polygon(polys[p], style);
+            poly.bindPopup(popup, { maxWidth: 280 });
+            tornadoLayerGroup.addLayer(poly);
+            if (polys[p][0]) {
+              polys[p][0].forEach(function (ll) {
+                bounds.push(ll);
+              });
+            }
+          }
+        } else if (geom.type === 'Point') {
+          const ll = [geom.coordinates[1], geom.coordinates[0]];
+          const mk = L.circleMarker(ll, {
+            radius: 8,
+            color: style.color,
+            fillColor: style.fillColor,
+            fillOpacity: 0.85,
+            weight: 2,
+          });
+          mk.bindPopup(popup, { maxWidth: 280 });
+          tornadoLayerGroup.addLayer(mk);
+          bounds.push(ll);
+        }
+      }
+
+      tornadoLayerGroup.addTo(m);
+
+      const torTotal = counts.torWarn + counts.torWatch + counts.torEmerg;
+      const svrTotal = counts.svrWarn + counts.svrWatch;
+
+      if (!features.length) {
+        if (info) {
+          info.innerHTML =
+            '<div class="map-info-title">Tornado &amp; severe</div>' +
+            '<div class="map-info-value" style="font-size:1.05rem">All clear</div>' +
+            '<p class="muted small">No active tornado or severe thunderstorm alerts (NWS)</p>';
+        }
+        if (legend) legend.textContent = 'Tornado · NWS · All clear';
+        // CONUS overview
+        if (!userExploring) {
+          m.setView([39.5, -98.35], 4, { animate: true });
+        }
+        return;
+      }
+
+      if (bounds.length) {
+        try {
+          m.fitBounds(bounds, { padding: [36, 36], maxZoom: 8, animate: true });
+          userExploring = true;
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      if (info) {
+        const parts = [];
+        if (counts.torEmerg) parts.push(counts.torEmerg + ' emergency');
+        if (counts.torWarn) parts.push(counts.torWarn + ' TOR warn');
+        if (counts.torWatch) parts.push(counts.torWatch + ' TOR watch');
+        if (counts.svrWarn) parts.push(counts.svrWarn + ' SVR warn');
+        if (counts.svrWatch) parts.push(counts.svrWatch + ' SVR watch');
+        info.innerHTML =
+          '<div class="map-info-title">Active alerts</div>' +
+          '<div class="map-info-value" style="font-size:1.05rem">' +
+          features.length +
+          (torTotal ? ' · ' + torTotal + ' tornado' : '') +
+          (svrTotal ? ' · ' + svrTotal + ' severe' : '') +
+          '</div>' +
+          '<p class="muted small">' +
+          escapeHtml(parts.join(' · ') || 'Tap polygons for details') +
+          ' · NWS</p>';
+      }
+      if (legend) {
+        legend.textContent =
+          'Red TOR warn · Yellow TOR watch · Orange SVR · NWS';
+      }
+    } catch (err) {
+      console.warn('Tornado load failed', err);
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Tornado</div>' +
+          '<p class="muted">Could not load NWS alerts</p>' +
+          '<p class="muted small">' +
+          escapeHtml(String((err && err.message) || err || '')) +
+          '</p>';
+      }
+      if (legend) legend.textContent = 'Tornado unavailable';
+    }
+  }
+
   // ─── Fog / generic overlay ──────────────────────────────────────────────
 
   function showDataOverlay(kind) {
@@ -1170,6 +1445,7 @@
     if (currentLayer !== 'radar') clearRadar();
     if (currentLayer !== 'wind') clearWind();
     if (currentLayer !== 'hurricane') clearHurricane();
+    if (currentLayer !== 'tornado') clearTornado();
 
     if (currentLayer === 'radar') {
       hideDataOverlay();
@@ -1190,6 +1466,9 @@
     } else if (currentLayer === 'hurricane') {
       setControlsVisible(false);
       loadHurricanes();
+    } else if (currentLayer === 'tornado') {
+      setControlsVisible(false);
+      loadTornadoes();
     } else {
       // fog
       setControlsVisible(false);

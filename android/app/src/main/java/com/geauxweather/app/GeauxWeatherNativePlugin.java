@@ -102,8 +102,13 @@ public class GeauxWeatherNativePlugin extends Plugin {
                 conn.setConnectTimeout(20000);
                 conn.setReadTimeout(45000);
                 conn.setInstanceFollowRedirects(true);
-                conn.setRequestProperty("User-Agent", "GeauxWeather/1.0 (Android; FOSS)");
-                conn.setRequestProperty("Accept", "*/*");
+                conn.setRequestProperty("User-Agent", "GeauxWeather/1.0 (Android; FOSS; +https://github.com/tunefriend/GeauxWeather)");
+                // NWS api.weather.gov prefers geo+json; others accept anything
+                if (urlStr.contains("api.weather.gov")) {
+                    conn.setRequestProperty("Accept", "application/geo+json,application/json");
+                } else {
+                    conn.setRequestProperty("Accept", "*/*");
+                }
 
                 int code = conn.getResponseCode();
                 InputStream in = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
