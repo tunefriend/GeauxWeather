@@ -27,15 +27,15 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 ## Features
 
-- Today, hourly, 10-day forecast  
-- Maps: Rain, Wind, Fog, Hurricane (NHC cone + track), Tornado (NWS watches/warnings)  
-- Severe storm alerts (Settings): tornado, severe thunderstorm, nearby tropical for home/default location  
+- **Today** — conditions, sunrise/sunset, hourly; weather sky backgrounds (day/night)  
+- **10-Day** — highs/lows and precip chance  
+- **Maps** — Rain (radar), Wind (arrows + particles), Fog, Hurricane (NHC cone/track), Tornado (NWS alerts)  
+- **Places** — save pins; GPS or default home location  
+- **Severe storm alerts** — optional location-based tornado / severe T-storm / nearby tropical (Settings)  
+- **Widget + status bar** temperature  
+- Feedback email · Liberapay donate · no ads / no tracking  
 
+## Download
 
-- Places, GPS + default location  
-
-
-- Weather backgrounds (day/night) with Settings toggle  
-- Home widget + status-bar temperature  
-- Feedback + Liberapay donate  
+Latest APK: [GeauxWeather v1.0.0](https://github.com/tunefriend/GeauxWeather/releases/tag/v1.0.0)
 
