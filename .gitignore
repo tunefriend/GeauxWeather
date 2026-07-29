@@ -23,3 +23,10 @@ android/.idea/
 .vscode/
 *.swp
 *~
+
+# Signing (never commit)
+android/keystore.properties
+android/*.keystore
+android/*.jks
+*signing-backup*.txt
+geauxweather-release-signing-backup.txt
