@@ -1,1 +1,1 @@
-Initial release: forecasts, radar maps, Places, custom icon.
+Initial GeauxWeather release: forecasts, radar, wind map, hurricane & tornado layers, severe storm alerts, Places, widget, and status temperature.

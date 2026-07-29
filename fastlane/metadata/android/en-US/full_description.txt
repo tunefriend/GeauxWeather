@@ -1,11 +1,12 @@
-PureSky is a free weather app with no ads and no tracking.
+GeauxWeather is a free weather app with no ads and no tracking.
 
 Features:
 • Current conditions, hourly and 10-day forecast (Open-Meteo)
-• Rain radar map with timeline (RainViewer)
+• Maps: rain radar (RainViewer), wind field, fog, hurricane cone/track (NHC), tornado & severe alerts (NWS)
 • Drop a pin on the map — nearest city name, save to Places
-• Places list with temperature and sky condition
-• Long-press a place to set your default city
-• Refresh uses GPS when available, otherwise your default
+• Places list; long-press to set your default city
+• Optional severe storm alerts for your home or default location
+• Weather sky backgrounds (day/night), home widget, status-bar temperature
+• Feedback and Liberapay donate
 
-Data from Open-Meteo and OpenStreetMap. No account required.
+Data from Open-Meteo, RainViewer, NHC, NWS, and OpenStreetMap. No account required.
