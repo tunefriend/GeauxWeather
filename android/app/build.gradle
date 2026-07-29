@@ -38,6 +38,12 @@ android {
             }
         }
     }
+    dependenciesInfo {
+        // Disable dependency metadata when building APKs (required by F-Droid).
+        includeInApk = false
+        // Disable dependency metadata when building Android App Bundles.
+        includeInBundle = false
+    }
 }
 
 repositories {
