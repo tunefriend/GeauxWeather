@@ -161,36 +161,11 @@
     };
   }
 
-  /** Free client endpoint — no API key */
-  async function reverseBigDataCloud(lat, lon) {
-    var url =
-      'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' +
-      encodeURIComponent(lat) +
-      '&longitude=' +
-      encodeURIComponent(lon) +
-      '&localityLanguage=en';
-    var res = await fetch(url);
-    if (!res.ok) return null;
-    var data = await res.json();
-    var name =
-      data.city ||
-      data.locality ||
-      data.principalSubdivision ||
-      null;
-    if (!name) return null;
-    var admin1 = data.principalSubdivision || '';
-    var country = data.countryName || '';
-    return {
-      name: name,
-      admin1: admin1,
-      country: country,
-      label: buildPlaceLabel(name, admin1, country),
-    };
-  }
-
   /**
-   * Nearest city/place for a lat/lon.
+   * Nearest city/place for a lat/lon (OpenStreetMap Nominatim only).
    * Prefers city → town → village → municipality → county.
+   * If reverse geocoding fails, return coordinates so weather still works
+   * without calling proprietary geocoding services.
    */
   async function reverseGeocode(lat, lon) {
     try {
@@ -199,12 +174,19 @@
     } catch (e) {
       console.warn('Nominatim reverse failed', e);
     }
-    try {
-      return await reverseBigDataCloud(lat, lon);
-    } catch (e) {
-      console.warn('BigDataCloud reverse failed', e);
-      return null;
-    }
+    var latN = Number(lat);
+    var lonN = Number(lon);
+    var label =
+      (isFinite(latN) ? latN.toFixed(2) : String(lat)) +
+      '°, ' +
+      (isFinite(lonN) ? lonN.toFixed(2) : String(lon)) +
+      '°';
+    return {
+      name: label,
+      admin1: '',
+      country: '',
+      label: label,
+    };
   }
 
   async function searchCity(query) {

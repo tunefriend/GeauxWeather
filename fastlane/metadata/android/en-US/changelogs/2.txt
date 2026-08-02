@@ -1,0 +1,3 @@
+• Remove BigDataCloud reverse-geocode fallback (F-Droid review)
+• Reverse geocoding is OpenStreetMap Nominatim only; coordinates shown if it fails
+• No proprietary geocoding services

@@ -37,5 +37,5 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 ## Download
 
-Latest APK: [GeauxWeather v1.0.0](https://github.com/tunefriend/GeauxWeather/releases/tag/v1.0.0)
+Latest APK: [GeauxWeather v1.0.1](https://github.com/tunefriend/GeauxWeather/releases/tag/v1.0.1)
 
