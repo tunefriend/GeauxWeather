@@ -1092,6 +1092,7 @@
   }
 
   const DONATE_URL = 'https://liberapay.com/west66/donate';
+  const WEBSITE_URL = 'https://geauxweather.com';
   const FEEDBACK_EMAIL = 'puresky.weather@proton.me';
 
   function openExternalLink(url) {
@@ -1139,6 +1140,14 @@
     btnDonate.addEventListener('click', function (e) {
       e.preventDefault();
       openExternalLink(DONATE_URL);
+    });
+  }
+
+  const btnWebsite = document.getElementById('btn-website');
+  if (btnWebsite) {
+    btnWebsite.addEventListener('click', function (e) {
+      e.preventDefault();
+      openExternalLink(WEBSITE_URL);
     });
   }
 

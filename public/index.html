@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="GeauxWeather — free, ad-free weather for Android. 10-day forecast, rain radar, wind, fog, hurricanes, tornado alerts. No tracking." />
+  <meta name="theme-color" content="#0b1220" />
+  <meta property="og:title" content="GeauxWeather" />
+  <meta property="og:description" content="Clean, fast, no-ads weather for Android." />
+  <meta property="og:url" content="https://geauxweather.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://geauxweather.com/img/01-today.jpg" />
+  <link rel="icon" href="/icon.png" type="image/png" />
+  <title>GeauxWeather — free weather, no ads</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #141c2e;
+      --text: #e8eef8;
+      --muted: #8b9bb4;
+      --accent: #3d8bfd;
+      --accent-2: #5eead4;
+      --border: rgba(255,255,255,0.08);
+      --ok: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #1a3a5c 0%, transparent 55%),
+                  radial-gradient(900px 500px at 90% 10%, #0f2a24 0%, transparent 50%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 40px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; }
+    .brand img { width: 40px; height: 40px; border-radius: 10px; }
+    nav { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    nav a { color: var(--muted); font-size: 0.95rem; }
+    nav a:hover { color: var(--text); }
+    .hero {
+      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 36px;
+      align-items: center; margin-bottom: 48px;
+    }
+    @media (max-width: 820px) {
+      .hero { grid-template-columns: 1fr; }
+    }
+    h1 {
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      line-height: 1.15; margin: 0 0 14px;
+      letter-spacing: -0.02em;
+    }
+    .lead { color: var(--muted); font-size: 1.1rem; margin: 0 0 22px; max-width: 36rem; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .badge {
+      font-size: 0.8rem; padding: 4px 10px; border-radius: 999px;
+      background: rgba(61,139,253,0.12); color: #9ec5ff; border: 1px solid rgba(61,139,253,0.25);
+    }
+    .badge.green { background: rgba(74,222,128,0.1); color: #86efac; border-color: rgba(74,222,128,0.25); }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 12px 18px; border-radius: 12px; font-weight: 600; border: 1px solid transparent;
+      text-decoration: none !important; font-size: 0.98rem;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
+    .phone {
+      background: var(--card); border: 1px solid var(--border); border-radius: 22px;
+      padding: 10px; box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+    }
+    .phone img {
+      width: 100%; display: block; border-radius: 14px; aspect-ratio: 9/16; object-fit: cover;
+      background: #0a0f18;
+    }
+    section { margin-bottom: 48px; }
+    h2 { font-size: 1.45rem; margin: 0 0 16px; letter-spacing: -0.01em; }
+    .grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    .shots {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    @media (max-width: 820px) { .shots { grid-template-columns: 1fr; } }
+    .shots figure {
+      margin: 0; background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+    }
+    .shots img { width: 100%; display: block; aspect-ratio: 9/16; object-fit: cover; }
+    .shots figcaption { padding: 10px 12px; color: var(--muted); font-size: 0.85rem; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; }
+    footer {
+      border-top: 1px solid var(--border); padding-top: 22px; color: var(--muted);
+      font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 12px 20px;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <img src="/icon.png" alt="" width="40" height="40" />
+        <span>GeauxWeather</span>
+      </div>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="https://github.com/tunefriend/GeauxWeather">Source</a>
+      </nav>
+    </header>
+
+    <div class="hero">
+      <div>
+        <div class="badges">
+          <span class="badge green">No ads</span>
+          <span class="badge green">No tracking</span>
+          <span class="badge">F-Droid · reproducible</span>
+          <span class="badge">GPL-3.0-or-later</span>
+        </div>
+        <h1>Weather that gets out of your way.</h1>
+        <p class="lead">
+          Clean Android weather: current conditions, hourly + 10-day forecast,
+          rain radar, wind, fog, hurricanes, and severe alerts — without ads or accounts.
+        </p>
+        <div class="cta" id="download">
+          <a class="btn btn-primary" href="https://f-droid.org/packages/com.geauxweather.app/">Get on F-Droid</a>
+          <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/releases/latest">Download APK</a>
+        </div>
+      </div>
+      <div class="phone">
+        <img src="/img/01-today.jpg" alt="GeauxWeather Today screen" width="360" height="640" />
+      </div>
+    </div>
+
+    <section id="features">
+      <h2>What you get</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Today &amp; 10-day</h3>
+          <p>Current conditions, feels-like, wind, humidity, UV, visibility, hourly strip, and a 10-day outlook.</p>
+        </div>
+        <div class="card">
+          <h3>Maps &amp; radar</h3>
+          <p>Rain radar, wind field, fog, NHC hurricane cone/track, and NWS tornado / severe polygons.</p>
+        </div>
+        <div class="card">
+          <h3>Places &amp; widgets</h3>
+          <p>Save locations, optional severe storm alerts, home-screen widget, and status-bar temperature.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Screenshots</h2>
+      <div class="shots">
+        <figure>
+          <img src="/img/01-today.jpg" alt="Today" loading="lazy" />
+          <figcaption>Today</figcaption>
+        </figure>
+        <figure>
+          <img src="/img/03-maps.jpg" alt="Maps" loading="lazy" />
+          <figcaption>Maps &amp; radar</figcaption>
+        </figure>
+        <figure>
+          <img src="/img/04-places.jpg" alt="Places" loading="lazy" />
+          <figcaption>Places</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>Data &amp; privacy</h2>
+      <div class="card">
+        <p>
+          Forecasts from <strong>Open-Meteo</strong>, radar from <strong>RainViewer</strong>,
+          storms from <strong>NHC</strong> / <strong>NWS</strong>, places via
+          <strong>OpenStreetMap Nominatim</strong>. No account, no analytics SDKs, no ads.
+          See the <a href="/privacy.html">privacy policy</a>.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Links</h2>
+      <div class="links">
+        <a class="btn btn-secondary" href="https://f-droid.org/packages/com.geauxweather.app/">F-Droid package</a>
+        <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather">GitHub</a>
+        <a class="btn btn-secondary" href="https://gitlab.com/tunefriend/geauxweather">GitLab</a>
+        <a class="btn btn-secondary" href="https://liberapay.com/west66/donate">Donate</a>
+        <a class="btn btn-secondary" href="mailto:puresky.weather@proton.me">Feedback</a>
+      </div>
+    </section>
+
+    <footer>
+      <span>© TuneFriend · GeauxWeather · GPL-3.0-or-later</span>
+      <span>Package ID: <code>com.geauxweather.app</code></span>
+    </footer>
+  </div>
+</body>
+</html>

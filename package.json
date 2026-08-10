@@ -7,7 +7,8 @@
     "sync": "npx cap sync android",
     "open": "npx cap open android",
     "android": "npx cap sync android && cd android && ./gradlew assembleDebug",
-    "apk": "bash scripts/build-apk.sh"
+    "apk": "bash scripts/build-apk.sh",
+    "deploy:cf": "npx wrangler deploy"
   },
   "keywords": [
     "weather",

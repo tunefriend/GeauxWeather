@@ -35,7 +35,16 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 - **Widget + status bar** temperature  
 - Feedback email · Liberapay donate · no ads / no tracking  
 
+## Website
+
+**https://geauxweather.com** — landing page + privacy policy (Cloudflare).
+
+```bash
+npx wrangler deploy   # see DEPLOY.md
+```
+
 ## Download
 
-Latest APK: [GeauxWeather v1.0.1](https://github.com/tunefriend/GeauxWeather/releases/tag/v1.0.1)
+- F-Droid: [com.geauxweather.app](https://f-droid.org/packages/com.geauxweather.app/)
+- APK: [latest release](https://github.com/tunefriend/GeauxWeather/releases/latest)
 
