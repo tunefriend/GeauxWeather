@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: weather-panel-v2 -->
+<!-- build: shots-fix-1786399464 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,7 +10,7 @@
   <meta property="og:description" content="Clean, fast, no-ads weather for Android." />
   <meta property="og:url" content="https://geauxweather.com/" />
   <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://geauxweather.com/img/01-today.jpg" />
+  <meta property="og:image" content="https://geauxweather.com/img/01-today.jpg?v=4" />
   <link rel="icon" href="/icon.png" type="image/png" />
   <title>GeauxWeather — free weather, no ads</title>
   <style>
@@ -197,17 +197,45 @@
     }
     .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
     .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
-    .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    @media (max-width: 900px) { .shots { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 520px) { .shots { grid-template-columns: 1fr; } }
+    .shots {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 520px) {
+      .shots { grid-template-columns: 1fr; max-width: 360px; margin: 0 auto; }
+    }
     .shots figure {
-      margin: 0; background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; overflow: hidden; backdrop-filter: blur(10px);
+      margin: 0;
+      background: rgba(10, 14, 22, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+      display: flex;
+      flex-direction: column;
     }
+    /* Full phone screenshots — no crop (source is ~9:20, not 9:16) */
     .shots img {
-      width: 100%; display: block; aspect-ratio: 9/16; object-fit: cover; object-position: top;
+      width: 100%;
+      height: auto;
+      display: block;
+      vertical-align: top;
+      object-fit: contain;
+      background: #0a0f18;
     }
-    .shots figcaption { padding: 10px 12px; color: var(--muted); font-size: 0.85rem; }
+    .shots figcaption {
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
     .links { display: flex; flex-wrap: wrap; gap: 10px; }
     footer {
       border-top: 1px solid var(--border); padding-top: 22px; color: var(--muted);
@@ -440,19 +468,19 @@
       <h2>Screenshots</h2>
       <div class="shots">
         <figure>
-          <img src="/img/01-today.jpg" alt="Today — current conditions in Livingston, Louisiana" loading="lazy" width="900" height="2000" />
+          <img src="/img/01-today.jpg?v=4" alt="Today — current conditions in Livingston, Louisiana" loading="lazy" width="900" height="2000" />
           <figcaption>Today</figcaption>
         </figure>
         <figure>
-          <img src="/img/03-maps.jpg" alt="Maps — rain radar over Louisiana" loading="lazy" width="900" height="2000" />
+          <img src="/img/03-maps.jpg?v=4" alt="Maps — rain radar over Louisiana" loading="lazy" width="900" height="2000" />
           <figcaption>Maps &amp; radar</figcaption>
         </figure>
         <figure>
-          <img src="/img/04-places.jpg" alt="Places — saved locations" loading="lazy" width="900" height="2000" />
+          <img src="/img/04-places.jpg?v=4" alt="Places — saved locations" loading="lazy" width="900" height="2000" />
           <figcaption>Places</figcaption>
         </figure>
         <figure>
-          <img src="/img/05-settings.jpg" alt="Settings — units, backgrounds, alerts, website" loading="lazy" width="900" height="2000" />
+          <img src="/img/05-settings.jpg?v=4" alt="Settings — units, backgrounds, alerts, website" loading="lazy" width="900" height="2000" />
           <figcaption>Settings</figcaption>
         </figure>
       </div>
