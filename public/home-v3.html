@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: real-rain-1786399887 -->
+<!-- build: https-geo-1786400241 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -767,23 +767,53 @@
   }
   function getGeo() {
     return new Promise(function (resolve, reject) {
-      if (!navigator.geolocation) { reject(new Error('Geolocation unavailable')); return; }
+      if (!window.isSecureContext) {
+        var err = new Error('insecure');
+        err.code = 'INSECURE';
+        reject(err);
+        return;
+      }
+      if (!navigator.geolocation) {
+        var err2 = new Error('unsupported');
+        err2.code = 'UNSUPPORTED';
+        reject(err2);
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
         function (pos) { resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
-        reject,
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        function (e) { reject(e); },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
       );
     });
   }
   async function useMyLocation() {
     var btn = document.getElementById('wx-geo');
     if (btn) btn.disabled = true;
-    setStatus('Getting location…');
+    // HTTP pages cannot use geolocation in modern browsers
+    if (location.protocol === 'http:') {
+      setStatus('Redirecting to secure site for location…');
+      location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+      return;
+    }
+    setStatus('Getting location… (allow when prompted)');
     try {
       var pos = await getGeo();
       await loadAt(pos.lat, pos.lon, null);
+      setStatus('');
     } catch (e) {
-      setStatus('Location denied — search for a city instead.', true);
+      var msg = 'Could not get location — search for a city instead.';
+      if (e && (e.code === 'INSECURE' || !window.isSecureContext)) {
+        msg = 'Location needs HTTPS — open https://geauxweather.com';
+      } else if (e && e.code === 1) {
+        msg = 'Location blocked in browser settings — allow location for this site, or search a city.';
+      } else if (e && e.code === 2) {
+        msg = 'Location unavailable — try again or search a city.';
+      } else if (e && e.code === 3) {
+        msg = 'Location timed out — try again or search a city.';
+      } else if (e && e.code === 'UNSUPPORTED') {
+        msg = 'This browser has no location support — search a city.';
+      }
+      setStatus(msg, true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -851,6 +881,11 @@
     await loadAt(30.5021, -90.7476, 'Livingston, Louisiana');
   }
   function boot() {
+    // Geolocation (and the lock icon) require HTTPS
+    if (location.protocol === 'http:') {
+      location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+      return;
+    }
     var h = new Date().getHours();
     isNight = h < 6 || h >= 20;
     applyMood(isNight ? 'night' : 'cloudy');
@@ -881,5 +916,4 @@
   </script>
 <!-- RAIN_ENGINE_V2_1786399912 -->
 </body>
-<!-- CANVAS_RAIN_OK -->
 </html>
