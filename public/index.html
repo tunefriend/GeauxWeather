@@ -11,41 +11,53 @@
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://geauxweather.com/img/01-today.jpg" />
   <link rel="icon" href="/icon.png" type="image/png" />
+  <link rel="stylesheet" href="/css/sky.css" />
   <title>GeauxWeather — free weather, no ads</title>
   <style>
     :root {
-      --bg: #0b1220;
-      --card: #141c2e;
       --text: #e8eef8;
-      --muted: #8b9bb4;
-      --accent: #3d8bfd;
+      --muted: rgba(200, 214, 230, 0.78);
+      --accent: #7ec0f0;
       --accent-2: #5eead4;
-      --border: rgba(255,255,255,0.08);
-      --ok: #4ade80;
+      --border: rgba(255, 255, 255, 0.12);
+      --card: rgba(14, 22, 34, 0.55);
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(1200px 600px at 20% -10%, #1a3a5c 0%, transparent 55%),
-                  radial-gradient(900px 500px at 90% 10%, #0f2a24 0%, transparent 50%),
-                  var(--bg);
       color: var(--text);
       line-height: 1.55;
       min-height: 100vh;
+      background: #0b0f14;
     }
     a { color: var(--accent-2); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
     header {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 16px; flex-wrap: wrap; margin-bottom: 40px;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
     }
     .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; }
-    .brand img { width: 40px; height: 40px; border-radius: 10px; }
+    .brand img { width: 40px; height: 40px; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
     nav { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-    nav a { color: var(--muted); font-size: 0.95rem; }
-    nav a:hover { color: var(--text); }
+    nav a {
+      color: var(--muted); font-size: 0.95rem;
+      padding: 6px 10px; border-radius: 8px;
+      background: rgba(12, 18, 28, 0.35);
+      border: 1px solid transparent;
+    }
+    nav a:hover {
+      color: var(--text); text-decoration: none;
+      border-color: var(--border);
+      background: rgba(12, 18, 28, 0.55);
+    }
     .hero {
       display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 36px;
       align-items: center; margin-bottom: 48px;
@@ -57,62 +69,107 @@
       font-size: clamp(2rem, 4vw, 2.75rem);
       line-height: 1.15; margin: 0 0 14px;
       letter-spacing: -0.02em;
+      text-shadow: 0 2px 24px rgba(0,0,0,0.35);
     }
-    .lead { color: var(--muted); font-size: 1.1rem; margin: 0 0 22px; max-width: 36rem; }
-    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .lead {
+      color: var(--muted); font-size: 1.1rem; margin: 0 0 22px; max-width: 36rem;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.3);
+    }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
     .badge {
       font-size: 0.8rem; padding: 4px 10px; border-radius: 999px;
-      background: rgba(61,139,253,0.12); color: #9ec5ff; border: 1px solid rgba(61,139,253,0.25);
+      background: rgba(61,139,253,0.18); color: #b8d8ff;
+      border: 1px solid rgba(61,139,253,0.3);
+      backdrop-filter: blur(8px);
     }
-    .badge.green { background: rgba(74,222,128,0.1); color: #86efac; border-color: rgba(74,222,128,0.25); }
+    .badge.green {
+      background: rgba(74,222,128,0.14); color: #9ef0b8;
+      border-color: rgba(74,222,128,0.3);
+    }
     .cta { display: flex; flex-wrap: wrap; gap: 12px; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
-      padding: 12px 18px; border-radius: 12px; font-weight: 600; border: 1px solid transparent;
-      text-decoration: none !important; font-size: 0.98rem;
+      padding: 12px 18px; border-radius: 12px; font-weight: 600;
+      border: 1px solid transparent; text-decoration: none !important; font-size: 0.98rem;
+      backdrop-filter: blur(10px);
     }
-    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary { background: rgba(61, 139, 253, 0.9); color: #fff; }
     .btn-primary:hover { filter: brightness(1.08); }
-    .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
-    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
+    .btn-secondary {
+      background: rgba(12, 18, 28, 0.5); color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover { background: rgba(12, 18, 28, 0.7); }
     .phone {
-      background: var(--card); border: 1px solid var(--border); border-radius: 22px;
-      padding: 10px; box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+      background: rgba(12, 18, 28, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 10px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
     }
     .phone img {
-      width: 100%; display: block; border-radius: 14px; aspect-ratio: 9/16; object-fit: cover;
-      background: #0a0f18;
+      width: 100%; display: block; border-radius: 14px;
+      aspect-ratio: 9/16; object-fit: cover; background: #0a0f18;
     }
     section { margin-bottom: 48px; }
-    h2 { font-size: 1.45rem; margin: 0 0 16px; letter-spacing: -0.01em; }
-    .grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    h2 {
+      font-size: 1.45rem; margin: 0 0 16px; letter-spacing: -0.01em;
+      text-shadow: 0 1px 16px rgba(0,0,0,0.35);
     }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
     .card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
     .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
     .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
-    .shots {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-    }
+    .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     @media (max-width: 820px) { .shots { grid-template-columns: 1fr; } }
     .shots figure {
-      margin: 0; background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; overflow: hidden;
+      margin: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
     }
     .shots img { width: 100%; display: block; aspect-ratio: 9/16; object-fit: cover; }
     .shots figcaption { padding: 10px 12px; color: var(--muted); font-size: 0.85rem; }
     .links { display: flex; flex-wrap: wrap; gap: 10px; }
     footer {
-      border-top: 1px solid var(--border); padding-top: 22px; color: var(--muted);
-      font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 12px 20px;
+      border-top: 1px solid var(--border);
+      padding-top: 22px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      display: flex; flex-wrap: wrap; gap: 12px 20px;
       justify-content: space-between;
     }
   </style>
 </head>
-<body>
+<body class="sky-mood-cloudy">
+  <!-- Interactive weather sky (same idea as the Android app) -->
+  <div id="sky-bg" class="sky-bg sky-mood-cloudy" aria-hidden="true">
+    <div class="sky-layer sky-gradient"></div>
+    <div class="sky-layer sky-sun sky-parallax" data-depth="14"></div>
+    <div class="sky-layer sky-clouds sky-parallax" data-depth="22">
+      <span class="cloud c1"></span>
+      <span class="cloud c2"></span>
+      <span class="cloud c3"></span>
+      <span class="cloud c4"></span>
+      <span class="cloud c5"></span>
+    </div>
+    <div class="sky-layer sky-rain"></div>
+    <div class="sky-layer sky-stars" id="sky-stars"></div>
+    <div class="sky-layer sky-moon sky-parallax" data-depth="10"></div>
+    <div class="sky-layer sky-vignette"></div>
+  </div>
+
   <div class="wrap">
     <header>
       <div class="brand">
@@ -129,6 +186,13 @@
 
     <div class="hero">
       <div>
+        <div class="sky-live" id="sky-live">
+          <span id="sky-live-text">Sky: loading…</span>
+          <button type="button" id="sky-cycle" title="Preview other skies">Cycle sky</button>
+          <button type="button" id="sky-live-btn" title="Use live weather again">Live</button>
+        </div>
+        <p class="sky-hint">Move your pointer — the sky shifts. Cycle previews sunny / clouds / rain / night, or load live weather near you.</p>
+
         <div class="badges">
           <span class="badge green">No ads</span>
           <span class="badge green">No tracking</span>
@@ -214,5 +278,7 @@
       <span>Package ID: <code>com.geauxweather.app</code></span>
     </footer>
   </div>
+
+  <script src="/js/sky.js"></script>
 </body>
 </html>

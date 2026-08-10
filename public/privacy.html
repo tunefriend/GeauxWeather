@@ -6,10 +6,11 @@
   <meta name="description" content="GeauxWeather privacy policy — no ads, no tracking, no accounts." />
   <meta name="theme-color" content="#0b1220" />
   <link rel="icon" href="/icon.png" type="image/png" />
+  <link rel="stylesheet" href="/css/sky.css" />
   <title>Privacy — GeauxWeather</title>
   <style>
     body {
-      margin: 0; font-family: system-ui, sans-serif; background: #0b1220; color: #e8eef8;
+      margin: 0; font-family: system-ui, sans-serif; background: transparent; color: #e8eef8;
       line-height: 1.6;
     }
     .wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
@@ -21,8 +22,15 @@
     code { background: #141c2e; padding: 1px 6px; border-radius: 6px; }
   </style>
 </head>
-<body>
-  <div class="wrap">
+<body class="sky-mood-night">
+  <div id="sky-bg" class="sky-bg sky-mood-night" aria-hidden="true">
+    <div class="sky-layer sky-gradient"></div>
+    <div class="sky-layer sky-stars" id="sky-stars"></div>
+    <div class="sky-layer sky-moon"></div>
+    <div class="sky-layer sky-vignette"></div>
+  </div>
+
+  <div class="wrap" style="position:relative;z-index:1">
     <p><a href="/">← GeauxWeather</a></p>
     <h1>Privacy policy</h1>
     <p class="muted">Last updated: August 2026 · App: GeauxWeather (<code>com.geauxweather.app</code>)</p>
@@ -85,5 +93,17 @@
       Source: <a href="https://github.com/tunefriend/GeauxWeather">GitHub</a>
     </p>
   </div>
+  <script>
+    (function(){
+      var el=document.getElementById('sky-stars');
+      if(!el) return;
+      var h='';
+      for(var i=0;i<40;i++){
+        var x=Math.random()*100,y=Math.random()*70,s=1+Math.random()*2,d=2+Math.random()*4;
+        h+='<span class="star" style="left:'+x+'%;top:'+y+'%;width:'+s+'px;height:'+s+'px;animation-duration:'+d+'s"></span>';
+      }
+      el.innerHTML=h;
+    })();
+  </script>
 </body>
 </html>

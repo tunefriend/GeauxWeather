@@ -1,0 +1,227 @@
+/* GeauxWeather site — interactive sky (mirrors app moods) */
+
+.sky-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.sky-layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.sky-parallax {
+  transition: transform 0.15s ease-out;
+}
+.sky-gradient {
+  transition: background 0.8s ease;
+  background: #0b0f14;
+}
+
+/* --- Sunny --- */
+.sky-mood-sunny .sky-gradient {
+  background:
+    radial-gradient(ellipse 70% 40% at 72% 14%, rgba(255, 210, 120, 0.28) 0%, transparent 50%),
+    linear-gradient(180deg, #2a5f8a 0%, #356f9a 30%, #3d7a9e 55%, #2a4058 100%);
+}
+.sky-mood-sunny .sky-sun {
+  background:
+    radial-gradient(circle at 72% 14%, rgba(255, 240, 200, 0.75) 0%, rgba(255, 200, 80, 0.4) 10%, rgba(255, 180, 50, 0.14) 22%, transparent 40%);
+  opacity: 1;
+}
+.sky-mood-sunny .sky-clouds { opacity: 0.22; }
+.sky-mood-sunny .sky-rain { opacity: 0; }
+.sky-mood-sunny .sky-vignette {
+  background: linear-gradient(180deg, rgba(8, 14, 24, 0.2) 0%, rgba(8, 14, 24, 0.45) 55%, rgba(8, 14, 24, 0.72) 100%);
+}
+
+/* --- Cloudy --- */
+.sky-mood-cloudy .sky-gradient {
+  background: linear-gradient(180deg, #3a424e 0%, #4a5460 40%, #3d4652 70%, #2a3038 100%);
+}
+.sky-mood-cloudy .sky-sun {
+  opacity: 0.1;
+  background: radial-gradient(circle at 60% 18%, rgba(255, 255, 240, 0.35) 0%, transparent 40%);
+}
+.sky-mood-cloudy .sky-clouds { opacity: 0.8; }
+.sky-mood-cloudy .sky-rain { opacity: 0; }
+.sky-mood-cloudy .sky-vignette {
+  background: linear-gradient(180deg, rgba(12, 14, 18, 0.3) 0%, rgba(12, 14, 18, 0.7) 100%);
+}
+
+/* --- Rain --- */
+.sky-mood-rain .sky-gradient {
+  background: linear-gradient(180deg, #121820 0%, #1a2430 45%, #1e2a38 100%);
+}
+.sky-mood-rain .sky-sun { opacity: 0; }
+.sky-mood-rain .sky-clouds {
+  opacity: 0.72;
+  filter: brightness(0.45) saturate(0.5);
+}
+.sky-mood-rain .sky-rain { opacity: 0.88; }
+.sky-mood-rain .sky-stars,
+.sky-mood-rain .sky-moon { opacity: 0; }
+.sky-mood-rain .sky-vignette {
+  background: linear-gradient(180deg, rgba(6, 10, 16, 0.3) 0%, rgba(6, 10, 16, 0.75) 100%);
+}
+
+/* --- Night --- */
+.sky-mood-night .sky-gradient {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(40, 50, 90, 0.35) 0%, transparent 55%),
+    linear-gradient(180deg, #050810 0%, #0a1020 40%, #121a30 100%);
+}
+.sky-mood-night .sky-sun { opacity: 0; }
+.sky-mood-night .sky-clouds {
+  opacity: 0.14;
+  filter: brightness(0.35);
+}
+.sky-mood-night .sky-rain { opacity: 0; }
+.sky-mood-night .sky-stars { opacity: 1; }
+.sky-mood-night .sky-moon {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 78% 14%, #f0f4ff 0%, #d8e0f0 8%, rgba(200, 210, 240, 0.25) 16%, transparent 32%);
+}
+.sky-mood-night .sky-vignette {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.sky-stars {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  animation: twinkle ease-in-out infinite alternate;
+  opacity: 0.85;
+}
+@keyframes twinkle {
+  from { opacity: 0.35; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.sky-moon {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+.sky-mood-sunny .sky-stars,
+.sky-mood-sunny .sky-moon,
+.sky-mood-cloudy .sky-stars,
+.sky-mood-cloudy .sky-moon {
+  opacity: 0;
+}
+
+.cloud {
+  position: absolute;
+  display: block;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 100px;
+  filter: blur(2px);
+  animation: drift 40s linear infinite;
+}
+.cloud::before,
+.cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+.cloud.c1 {
+  width: 140px; height: 44px; top: 12%; left: -20%;
+  animation-duration: 48s;
+}
+.cloud.c1::before { width: 50px; height: 50px; top: -26px; left: 24px; }
+.cloud.c1::after { width: 70px; height: 70px; top: -36px; left: 52px; }
+.cloud.c2 {
+  width: 180px; height: 50px; top: 22%; left: 30%; opacity: 0.7;
+  animation-duration: 56s; animation-delay: -12s;
+}
+.cloud.c2::before { width: 60px; height: 60px; top: -30px; left: 30px; }
+.cloud.c2::after { width: 80px; height: 80px; top: -40px; left: 70px; }
+.cloud.c3 {
+  width: 120px; height: 40px; top: 8%; left: 60%; opacity: 0.5;
+  animation-duration: 62s; animation-delay: -25s;
+}
+.cloud.c3::before { width: 44px; height: 44px; top: -22px; left: 20px; }
+.cloud.c3::after { width: 58px; height: 58px; top: -30px; left: 48px; }
+.cloud.c4 {
+  width: 200px; height: 56px; top: 32%; left: 10%; opacity: 0.45;
+  animation-duration: 70s; animation-delay: -8s;
+}
+.cloud.c4::before { width: 70px; height: 70px; top: -36px; left: 40px; }
+.cloud.c4::after { width: 90px; height: 90px; top: -46px; left: 90px; }
+.cloud.c5 {
+  width: 160px; height: 48px; top: 18%; left: 75%; opacity: 0.4;
+  animation-duration: 52s; animation-delay: -30s;
+}
+.cloud.c5::before { width: 55px; height: 55px; top: -28px; left: 28px; }
+.cloud.c5::after { width: 72px; height: 72px; top: -38px; left: 64px; }
+
+@keyframes drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(120vw); }
+}
+
+.sky-rain {
+  opacity: 0;
+  background-image:
+    linear-gradient(160deg, transparent 30%, rgba(180, 210, 255, 0.35) 50%, transparent 70%),
+    linear-gradient(155deg, transparent 20%, rgba(160, 200, 255, 0.28) 45%, transparent 65%),
+    linear-gradient(165deg, transparent 25%, rgba(200, 220, 255, 0.22) 50%, transparent 70%);
+  background-size: 8px 18px, 11px 22px, 7px 16px;
+  background-repeat: repeat;
+  animation: rain-fall 0.55s linear infinite;
+  transition: opacity 0.6s ease;
+}
+@keyframes rain-fall {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: -20px 40px, 15px 50px, -10px 36px; }
+}
+
+/* Lightning flash on rain (subtle, occasional) */
+.sky-bg.flash .sky-gradient {
+  filter: brightness(1.55);
+  transition: filter 0.05s linear;
+}
+
+/* Live weather chip */
+.sky-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(12, 18, 28, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(232, 238, 246, 0.9);
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+.sky-live button {
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.sky-live button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.sky-hint {
+  font-size: 0.8rem;
+  color: rgba(200, 214, 230, 0.65);
+  margin: 0 0 18px;
+}
