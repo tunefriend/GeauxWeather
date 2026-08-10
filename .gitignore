@@ -31,3 +31,4 @@ android/*.jks
 *signing-backup*.txt
 geauxweather-release-signing-backup.txt
 .env
+public/js/*.bak
