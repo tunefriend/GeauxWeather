@@ -6,7 +6,6 @@
   <meta name="description" content="GeauxWeather privacy policy — no ads, no tracking, no accounts." />
   <meta name="theme-color" content="#0b1220" />
   <link rel="icon" href="/icon.png" type="image/png" />
-  <link rel="stylesheet" href="/css/sky.css" />
   <title>Privacy — GeauxWeather</title>
   <style>
     body {
@@ -21,7 +20,18 @@
     ul { padding-left: 1.2rem; }
     code { background: #141c2e; padding: 1px 6px; border-radius: 6px; }
   </style>
-</head>
+
+  <style>
+  .sky-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .sky-layer{position:absolute;inset:0}
+  .sky-mood-night .sky-gradient{background:radial-gradient(ellipse 60% 40% at 50% 100%,rgba(40,50,90,.35) 0%,transparent 55%),linear-gradient(180deg,#050810 0%,#0a1020 40%,#121a30 100%)}
+  .sky-mood-night .sky-stars{opacity:1}
+  .sky-mood-night .sky-moon{opacity:1;background:radial-gradient(circle at 78% 14%,#f0f4ff 0%,#d8e0f0 8%,rgba(200,210,240,.25) 16%,transparent 32%)}
+  .sky-mood-night .sky-vignette{background:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.55) 100%)}
+  .star{position:absolute;border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(255,255,255,.8);animation:twinkle ease-in-out infinite alternate}
+  @keyframes twinkle{from{opacity:.35}to{opacity:1}}
+  </style>
+  </head>
 <body class="sky-mood-night">
   <div id="sky-bg" class="sky-bg sky-mood-night" aria-hidden="true">
     <div class="sky-layer sky-gradient"></div>
