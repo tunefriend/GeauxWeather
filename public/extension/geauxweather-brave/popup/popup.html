@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeauxWeather</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="../icons/icon32.png" width="22" height="22" alt="" />
+      <span>GeauxWeather</span>
+    </div>
+    <button type="button" id="btn-refresh" class="icon-btn" title="Refresh">↻</button>
+  </header>
+
+  <main>
+    <div id="place" class="place">—</div>
+    <div id="temp" class="temp">—°</div>
+    <div id="cond" class="cond">Loading…</div>
+    <div id="feels" class="feels">Feels —</div>
+
+    <div class="metrics">
+      <div><span class="lbl">Wind</span><span id="wind" class="val">—</span></div>
+      <div><span class="lbl">Humidity</span><span id="hum" class="val">—</span></div>
+      <div><span class="lbl">UV</span><span id="uv" class="val">—</span></div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="btn-geo" class="btn primary">Use my location</button>
+    </div>
+
+    <div class="search-row">
+      <input id="city" type="search" placeholder="Enter a city…" autocomplete="off" />
+      <button type="button" id="btn-search" class="btn">Search</button>
+    </div>
+    <ul id="results" class="results" hidden></ul>
+    <p id="status" class="status" role="status"></p>
+  </main>
+
+  <footer>
+    <a id="open-site" href="https://geauxweather.com" target="_blank" rel="noopener">Open website ↗</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
