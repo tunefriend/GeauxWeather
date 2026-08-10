@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: https-geo-1786400241 -->
+<!-- build: linux-install-1786402319 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -247,6 +247,22 @@
       border-top: 1px solid rgba(255,255,255,0.06);
     }
     .links { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    pre.codeblock {
+      margin: 10px 0 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(8, 12, 20, 0.65);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #d7e6ff;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .muted-line { color: var(--muted); font-size: 0.92rem; margin: 10px 0 0; }
+
     footer {
       border-top: 1px solid var(--border); padding-top: 22px; color: var(--muted);
       font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 12px 20px;
@@ -397,6 +413,7 @@
         <a href="#features">Features</a>
         <a href="#download">Download</a>
         <a href="/privacy.html">Privacy</a>
+        <a href="#linux">Linux</a>
         <a href="https://github.com/tunefriend/GeauxWeather">Source</a>
       </nav>
     </header>
@@ -423,6 +440,7 @@
         <div class="cta" id="download">
           <span class="btn btn-primary btn-soon" title="Pending F-Droid inclusion">Coming soon on F-Droid</span>
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/releases/latest">Download APK</a>
+          <a class="btn btn-secondary" href="#linux">Linux tray</a>
         </div>
       </div>
 
@@ -508,10 +526,34 @@
       </div>
     </section>
 
+    
+    <section id="linux">
+      <h2>Linux desktop tray</h2>
+      <div class="card">
+        <p>
+          For <strong>Debian / Ubuntu / GNOME</strong>: install a top-bar tray icon that shows
+          the temperature and opens this site. Also adds a <strong>GeauxWeather</strong> app launcher.
+        </p>
+        <p style="margin-top:12px"><strong>One-line install:</strong></p>
+        <pre class="codeblock" id="linux-install-cmd">curl -fsSL https://geauxweather.com/linux/install.sh | bash</pre>
+        <p class="muted-line">Then start the tray:</p>
+        <pre class="codeblock">python3 ~/.local/share/geauxweather-widget/geauxweather_tray.py &amp;</pre>
+        <div class="links" style="margin-top:14px">
+          <a class="btn btn-secondary" href="/linux/geauxweather-linux-tray.tar.gz">Download .tar.gz</a>
+          <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/tree/main/linux">Source on GitHub</a>
+        </div>
+        <p class="muted-line" style="margin-top:12px">
+          Pin the app: Activities → search GeauxWeather → right-click → Pin to Dash.
+          Needs the AppIndicator GNOME extension (install script installs the package on Debian).
+        </p>
+      </div>
+    </section>
+
     <section>
       <h2>Links</h2>
       <div class="links">
         <span class="btn btn-secondary btn-soon" title="Pending F-Droid inclusion">F-Droid — coming soon</span>
+        <a class="btn btn-secondary" href="/linux/geauxweather-linux-tray.tar.gz">Linux tray (.tar.gz)</a>
         <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather">GitHub</a>
         <a class="btn btn-secondary" href="https://gitlab.com/tunefriend/geauxweather">GitLab</a>
         <a class="btn btn-secondary" href="https://liberapay.com/west66/donate">Donate</a>
