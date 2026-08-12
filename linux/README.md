@@ -1,8 +1,12 @@
-# GeauxWeather Linux tray (GNOME / Debian)
+# GeauxWeather Linux tray
 
 System tray weather + launcher for **https://geauxweather.com**.
 
-## Quick install (Debian / Ubuntu / GNOME)
+Works on **all major Linux desktops** with a system tray / status area:
+**GNOME, KDE Plasma, XFCE, Cinnamon, MATE, Budgie, LXQt**, and others that
+support AppIndicator / StatusNotifierItem.
+
+## Quick install (Debian / Ubuntu)
 
 ```bash
 curl -fsSL https://geauxweather.com/linux/install.sh | bash
@@ -19,17 +23,36 @@ bash install.sh
 
 ## What you get
 
-- **Top-bar tray icon** with temperature (AppIndicator)
+- **Panel / tray icon** with temperature (AppIndicator)
 - Menu: open website · refresh · quit
-- **Applications → GeauxWeather** opens the website
-- Autostart at login
+- **App menu → GeauxWeather** starts the tray (if already running, opens the website)
+- Autostart at login (standard XDG autostart)
+
+## Desktop notes
+
+| Desktop | Tray location | Extra setup |
+|---------|---------------|-------------|
+| GNOME | Top bar | AppIndicator extension (auto-installed on Debian/Ubuntu) |
+| KDE Plasma | System tray | Native — none |
+| XFCE | Notification area | Native — none |
+| Cinnamon / MATE / Budgie / LXQt | Panel tray | Native — none |
 
 ## Requirements
 
-- GNOME (or any desktop with AppIndicator / StatusNotifier support)
-- `python3`, `python3-gi`, GTK 3
-- `gir1.2-ayatanaappindicator3-0.1` (installed by `install.sh` on Debian/Ubuntu)
-- GNOME extension **AppIndicator and KStatusNotifierItem Support** (package `gnome-shell-extension-appindicator` on Debian)
+- `python3`, `python3-gi` (PyGObject), GTK 3
+- Ayatana AppIndicator (or AppIndicator3) GIR bindings
+- `python3-pil` recommended (temperature icon drawing)
+- On Debian/Ubuntu, `install.sh` installs these with apt
+
+Other distros (examples):
+
+```bash
+# Fedora
+sudo dnf install python3-gobject gtk3 libappindicator-gtk3 python3-pillow
+
+# Arch
+sudo pacman -S python-gobject gtk3 libayatana-appindicator python-pillow
+```
 
 ## Uninstall
 

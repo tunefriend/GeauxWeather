@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: brave-ext-1786404816 -->
+<!-- build: store-zip-1786404977 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,13 +7,27 @@
   <meta name="description" content="GeauxWeather — free, ad-free weather for Android. 10-day forecast, rain radar, wind, fog, hurricanes, tornado alerts. No tracking." />
   <meta name="gw-build" content="1786399887" />
   <meta name="theme-color" content="#0b1220" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GeauxWeather" />
+  <meta name="application-name" content="GeauxWeather" />
   <meta property="og:title" content="GeauxWeather" />
-  <meta property="og:description" content="Clean, fast, no-ads weather for Android." />
+  <meta property="og:description" content="Clean, fast, no-ads weather — install as an app on Windows, Android, and more." />
   <meta property="og:url" content="https://geauxweather.com/" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://geauxweather.com/img/01-today.jpg?v=1786399537" />
   <link rel="icon" href="/icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/lib/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/css/maps-web.css" />
   <title>GeauxWeather — free weather, no ads</title>
+  <script src="/js/pwa.js" defer></script>
+  <script src="/js/maps-bridge.js" defer></script>
+  <script src="/lib/leaflet/leaflet.js" defer></script>
+  <script src="/js/kmz.js" defer></script>
+  <script src="/js/maps.js" defer></script>
   <style>
     :root {
       --text: #e8eef8;
@@ -34,21 +48,214 @@
     }
     a { color: var(--accent-2); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .wrap { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+    .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px 20px 64px; }
+
+    /* Weather Channel–style scrolling temps */
+    .wx-ticker {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8, 14, 24, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+    }
+    .wx-ticker-inner {
+      display: flex;
+      align-items: stretch;
+      min-height: 44px;
+    }
+    .wx-ticker-label {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #9ec8f0;
+      background: linear-gradient(90deg, rgba(61,139,253,0.28), rgba(61,139,253,0.08));
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      z-index: 1;
+    }
+    .wx-ticker-label span.dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #5eead4;
+      box-shadow: 0 0 8px rgba(94,234,212,0.8);
+      animation: tickerPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes tickerPulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+    .wx-ticker-viewport {
+      flex: 1 1 auto;
+      overflow: hidden;
+      mask-image: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
+    }
+    .wx-ticker-track {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      width: max-content;
+      padding: 8px 0;
+      animation: tickerScroll 90s linear infinite;
+    }
+    .wx-ticker:hover .wx-ticker-track { animation-play-state: paused; }
+    @keyframes tickerScroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .wx-ticker-track { animation: none; }
+      .wx-ticker-viewport { overflow-x: auto; }
+      .wx-ticker-label span.dot { animation: none; }
+    }
+    .wx-ticker-item {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 4px 18px;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: transparent;
+      border-top: 0; border-bottom: 0; border-left: 0;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .wx-ticker-item:hover {
+      background: rgba(61,139,253,0.12);
+    }
+    .wx-ticker-item .city {
+      font-weight: 600;
+      color: rgba(220, 232, 248, 0.95);
+    }
+    .wx-ticker-item .temp {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+      min-width: 2.4em;
+    }
+    .wx-ticker-item .cond {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .wx-ticker-item.is-you {
+      background: rgba(94, 234, 212, 0.1);
+    }
+    .wx-ticker-item.is-you .city { color: #5eead4; }
+    .wx-ticker-item.is-you .city::after {
+      content: " · you";
+      font-weight: 500;
+      font-size: 0.72rem;
+      opacity: 0.85;
+    }
+    .wx-ticker-item.is-loading,
+    .wx-ticker-item.is-err {
+      color: var(--muted);
+      cursor: default;
+    }
+
     header {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
+      display: flex; align-items: center; gap: 16px 20px;
+      margin-bottom: 18px; margin-top: 14px;
+      flex-wrap: nowrap;
     }
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; }
+    .brand {
+      display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem;
+      flex: 0 0 auto;
+    }
     .brand img { width: 40px; height: 40px; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
-    nav { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-    nav a {
-      color: var(--muted); font-size: 0.95rem; padding: 6px 10px; border-radius: 8px;
-      background: rgba(12, 18, 28, 0.35); border: 1px solid transparent;
+    /* Long horizontal 10-day in the header bar */
+    .header-forecast {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
-    nav a:hover {
-      color: var(--text); text-decoration: none; border-color: var(--border);
-      background: rgba(12, 18, 28, 0.55);
+    .header-forecast-meta {
+      display: flex; align-items: baseline; gap: 10px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding-left: 2px;
+    }
+    .header-forecast-meta strong {
+      color: rgba(200, 220, 240, 0.9);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+    }
+    .day-strip {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 4px 2px 6px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(126,192,240,0.35) transparent;
+      -webkit-overflow-scrolling: touch;
+    }
+    .day-strip::-webkit-scrollbar { height: 4px; }
+    .day-strip::-webkit-scrollbar-thumb {
+      background: rgba(126,192,240,0.35); border-radius: 4px;
+    }
+    .day-chip {
+      flex: 1 0 auto;
+      min-width: 4.6rem;
+      max-width: 6.2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 6px 7px;
+      border-radius: 12px;
+      background: rgba(10, 16, 26, 0.45);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-align: center;
+    }
+    .day-chip.is-today {
+      border-color: rgba(61, 139, 253, 0.55);
+      background: rgba(61, 139, 253, 0.14);
+    }
+    .day-chip .d-name {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: rgba(220, 232, 248, 0.95);
+    }
+    .day-chip .d-icon { font-size: 1.15rem; line-height: 1.2; }
+    .day-chip .d-temps {
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .day-chip .d-hi { color: #fff; }
+    .day-chip .d-lo { color: var(--muted); font-weight: 500; }
+    .day-chip .d-pop {
+      font-size: 0.65rem;
+      color: #7ec0f0;
+      font-weight: 600;
+      min-height: 0.9em;
+    }
+    @media (max-width: 720px) {
+      header { flex-wrap: wrap; }
+      .header-forecast { flex-basis: 100%; }
+      .day-chip { min-width: 4.2rem; }
     }
     .hero {
       display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px;
@@ -403,20 +610,38 @@
     <div class="sky-layer sky-vignette"></div>
   </div>
 
+  <!-- Scrolling temps (Weather Channel–style) — website only -->
+  <div class="wx-ticker" aria-label="Temperatures around the country and world">
+    <div class="wx-ticker-inner">
+      <div class="wx-ticker-label" title="Temperatures near your location"><span class="dot" aria-hidden="true"></span> Nearby</div>
+      <div class="wx-ticker-viewport">
+        <div class="wx-ticker-track" id="wx-ticker-track">
+          <button type="button" class="wx-ticker-item is-loading">Loading temperatures…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="wrap">
     <header>
       <div class="brand">
         <img src="/icon.png" alt="" width="40" height="40" />
         <span>GeauxWeather</span>
       </div>
-      <nav>
-        <a href="#features">Features</a>
-        <a href="#download">Download</a>
-        <a href="/privacy.html">Privacy</a>
-        <a href="#linux">Linux</a>
-        <a href="#extension">Extension</a>
-        <a href="https://github.com/tunefriend/GeauxWeather">Source</a>
-      </nav>
+      <div class="header-forecast" id="forecast" aria-label="10-day forecast">
+        <div class="header-forecast-meta">
+          <strong>10-day</strong>
+          <span id="forecast-place">—</span>
+        </div>
+        <div class="day-strip" id="day-list" role="list">
+          <div class="day-chip" role="listitem">
+            <span class="d-name">…</span>
+            <span class="d-icon">☁️</span>
+            <span class="d-temps"><span class="d-hi">—°</span> <span class="d-lo">—°</span></span>
+            <span class="d-pop"></span>
+          </div>
+        </div>
+      </div>
     </header>
 
     <div class="hero">
@@ -430,7 +655,7 @@
         <div class="badges">
           <span class="badge green">No ads</span>
           <span class="badge green">No tracking</span>
-          <span class="badge">F-Droid soon · reproducible</span>
+          <span class="badge green">On F-Droid · reproducible</span>
           <span class="badge">GPL-3.0-or-later</span>
         </div>
         <h1>Weather that gets out of your way.</h1>
@@ -439,8 +664,10 @@
           rain radar, wind, fog, hurricanes, and severe alerts — without ads or accounts.
         </p>
         <div class="cta" id="download">
-          <span class="btn btn-primary btn-soon" title="Pending F-Droid inclusion">Coming soon on F-Droid</span>
+          <a class="btn btn-primary" href="https://f-droid.org/packages/com.geauxweather.app/" rel="noopener">Get on F-Droid</a>
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/releases/latest">Download APK</a>
+          <a class="btn btn-secondary" href="#maps">Maps &amp; radar</a>
+          <a class="btn btn-secondary" href="#install-app">Install as app</a>
           <a class="btn btn-secondary" href="#linux">Linux tray</a>
           <a class="btn btn-secondary" href="#extension">Brave extension</a>
         </div>
@@ -476,20 +703,39 @@
       </aside>
     </div>
 
-    <section id="features">
-      <h2>What you get</h2>
-      <div class="grid">
-        <div class="card">
-          <h3>Today &amp; 10-day</h3>
-          <p>Current conditions, feels-like, wind, humidity, UV, visibility, hourly strip, and a 10-day outlook.</p>
-        </div>
-        <div class="card">
-          <h3>Maps &amp; radar</h3>
-          <p>Rain radar, wind field, fog, NHC hurricane cone/track, and NWS tornado / severe polygons.</p>
-        </div>
-        <div class="card">
-          <h3>Places &amp; widgets</h3>
-          <p>Save locations, optional severe storm alerts, home-screen widget, and status-bar temperature.</p>
+    <section id="maps" class="maps-section">
+      <h2>Maps &amp; radar</h2>
+      <div class="card">
+        <p style="margin:0 0 12px">
+          Layers: <strong>Rain</strong> (RainViewer),
+          <strong>Wind</strong>, <strong>Fog</strong>,
+          <strong>Hurricane</strong> (NHC), <strong>Tornado / severe</strong> (NWS),
+          and <strong>Eclipse</strong> (path of totality for upcoming solar eclipses).
+          Click the map to drop a pin — it updates the weather panel above.
+        </p>
+        <div class="maps-wrap">
+          <div class="map-toolbar">
+            <button type="button" class="layer-btn active" data-layer="radar">Rain</button>
+            <button type="button" class="layer-btn" data-layer="wind">Wind</button>
+            <button type="button" class="layer-btn" data-layer="fog">Fog</button>
+            <button type="button" class="layer-btn" data-layer="hurricane">Hurricane</button>
+            <button type="button" class="layer-btn" data-layer="tornado">Tornado</button>
+            <button type="button" class="layer-btn" data-layer="eclipse">Eclipse</button>
+            <button type="button" id="map-recenter" class="layer-btn map-tool-btn" title="Recenter">⊙</button>
+          </div>
+          <div id="map" class="map-container" role="application" aria-label="Weather map"></div>
+          <div class="map-pin-bar">
+            <span id="map-pin-hint" class="map-pin-hint">Click map to drop a pin</span>
+          </div>
+          <div id="radar-controls" class="radar-controls">
+            <button type="button" id="radar-prev" class="radar-btn" aria-label="Previous">‹</button>
+            <button type="button" id="radar-play" class="radar-btn play" aria-label="Play">▶</button>
+            <button type="button" id="radar-next" class="radar-btn" aria-label="Next">›</button>
+            <input type="range" id="radar-slider" class="radar-slider" min="0" max="0" value="0" />
+            <span id="radar-time" class="radar-time">—</span>
+          </div>
+          <div id="map-info" class="map-info hidden"></div>
+          <div class="map-legend" id="map-legend">Click map to pin · RainViewer</div>
         </div>
       </div>
     </section>
@@ -516,6 +762,24 @@
       </div>
     </section>
 
+    <section id="features">
+      <h2>Also with the App</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Today &amp; 10-day</h3>
+          <p>Current conditions, feels-like, wind, humidity, UV, visibility, hourly strip, and a 10-day outlook.</p>
+        </div>
+        <div class="card">
+          <h3>Maps &amp; radar</h3>
+          <p>Rain radar, wind field, fog, NHC hurricane cone/track, and NWS tornado / severe polygons — same layers as on this site.</p>
+        </div>
+        <div class="card">
+          <h3>Places &amp; widgets</h3>
+          <p>Save locations, optional severe storm alerts, home-screen widget, and status-bar temperature.</p>
+        </div>
+      </div>
+    </section>
+
     <section>
       <h2>Data &amp; privacy</h2>
       <div class="card">
@@ -529,6 +793,32 @@
     </section>
 
     
+
+    <section id="install-app">
+      <h2>Install as an app (PWA)</h2>
+      <div class="card">
+        <p>
+          Install GeauxWeather from this website — no Store account required.
+          Works on <strong>Windows 11</strong> (Edge or Chrome), desktop Linux,
+          ChromeOS, and Android Chrome. Opens in its own window like a normal app.
+        </p>
+        <div class="links" style="margin-top:14px">
+          <button type="button" class="btn btn-primary" id="pwa-install-btn" hidden>
+            Install GeauxWeather
+          </button>
+        </div>
+        <p class="muted-line" id="pwa-install-hint" style="margin-top:12px">
+          <strong>Windows 11:</strong> open this site in <strong>Edge</strong> or <strong>Chrome</strong>
+          → browser menu (⋯) → <strong>Apps</strong> → <strong>Install this site as an app</strong>
+          (or look for the install icon in the address bar).
+          <br />
+          <strong>Android:</strong> Chrome menu → <strong>Install app</strong> / <strong>Add to Home screen</strong>.
+          <br />
+          <strong>Desktop Linux / ChromeOS:</strong> same Install app option in Chrome or Edge when available.
+        </p>
+        <p class="muted-line" id="pwa-install-status" hidden style="margin-top:10px"></p>
+      </div>
+    </section>
 
     <section id="extension">
       <h2>Brave / Chrome extension</h2>
@@ -546,7 +836,8 @@
           <li>Pin GeauxWeather from the puzzle-piece menu</li>
         </ol>
         <div class="links" style="margin-top:14px">
-          <a class="btn btn-primary" href="/extension/geauxweather-brave.zip">Download Brave extension</a>
+          <a class="btn btn-primary" href="/extension/geauxweather-chrome-store.zip">Chrome Web Store ZIP</a>
+          <a class="btn btn-secondary" href="/extension/geauxweather-brave.zip">Manual install ZIP</a>
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/tree/main/extension/brave">Source on GitHub</a>
         </div>
       </div>
@@ -556,8 +847,12 @@
       <h2>Linux desktop tray</h2>
       <div class="card">
         <p>
-          For <strong>Debian / Ubuntu / GNOME</strong>: install a top-bar tray icon that shows
-          the temperature and opens this site. Also adds a <strong>GeauxWeather</strong> app launcher.
+          Works on <strong>all major Linux desktops</strong> with a system tray /
+          status area — <strong>GNOME, KDE Plasma, XFCE, Cinnamon, MATE, Budgie, LXQt</strong>,
+          and others that support AppIndicator / StatusNotifier.
+          Shows the temperature in the panel and opens this site. Also adds a
+          <strong>GeauxWeather</strong> app launcher. Best on Debian / Ubuntu
+          (one-line install); other distros need the same Python/GTK packages.
         </p>
         <p style="margin-top:12px"><strong>One-line install:</strong></p>
         <pre class="codeblock" id="linux-install-cmd">curl -fsSL https://geauxweather.com/linux/install.sh | bash</pre>
@@ -568,8 +863,13 @@
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/tree/main/linux">Source on GitHub</a>
         </div>
         <p class="muted-line" style="margin-top:12px">
-          Pin the app: Activities → search GeauxWeather → right-click → Pin to Dash.
-          Needs the AppIndicator GNOME extension (install script installs the package on Debian).
+          <strong>Any desktop:</strong> app menu → <strong>GeauxWeather</strong> starts the tray
+          (if it’s already running, opens the website). Autostarts at login.
+          After Quit, open GeauxWeather from the menu again to bring the temp back.
+          <br />
+          <strong>GNOME:</strong> needs the AppIndicator extension (install script adds it on Debian/Ubuntu).
+          <br />
+          <strong>KDE / XFCE / Cinnamon / MATE / Budgie / LXQt:</strong> tray icons work natively — no extra extension.
         </p>
       </div>
     </section>
@@ -577,7 +877,7 @@
     <section>
       <h2>Links</h2>
       <div class="links">
-        <span class="btn btn-secondary btn-soon" title="Pending F-Droid inclusion">F-Droid — coming soon</span>
+        <a class="btn btn-secondary" href="https://f-droid.org/packages/com.geauxweather.app/" rel="noopener">F-Droid</a>
         <a class="btn btn-secondary" href="/linux/geauxweather-linux-tray.tar.gz">Linux tray (.tar.gz)</a>
         <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather">GitHub</a>
         <a class="btn btn-secondary" href="https://gitlab.com/tunefriend/geauxweather">GitLab</a>
@@ -764,6 +1064,82 @@
     el.textContent = msg || '';
     el.className = 'wx-status' + (isErr ? ' err' : '');
   }
+  function dayName(dateStr, index) {
+    if (index === 0) return 'Today';
+    if (index === 1) return 'Tomorrow';
+    try {
+      var dt = new Date(dateStr + 'T12:00:00');
+      return dt.toLocaleDateString([], { weekday: 'short' });
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  function renderDaily(loc, data) {
+    var list = document.getElementById('day-list');
+    var placeEl = document.getElementById('forecast-place');
+    if (placeEl) placeEl.textContent = loc && loc.label ? loc.label : '—';
+    if (!list) return;
+
+    var d = data && data.daily;
+    if (!d || !d.time || !d.time.length) {
+      list.innerHTML =
+        '<div class="day-chip" role="listitem">' +
+        '<span class="d-name">—</span><span class="d-icon">☁️</span>' +
+        '<span class="d-temps"><span class="d-hi">—°</span> <span class="d-lo">—°</span></span>' +
+        '<span class="d-pop"></span></div>';
+      return;
+    }
+
+    var n = Math.min(10, d.time.length);
+    var html = '';
+    var i;
+    for (i = 0; i < n; i++) {
+      var code = d.weather_code ? d.weather_code[i] : null;
+      var hi = d.temperature_2m_max && d.temperature_2m_max[i] != null
+        ? Math.round(d.temperature_2m_max[i]) + '°'
+        : '—°';
+      var lo = d.temperature_2m_min && d.temperature_2m_min[i] != null
+        ? Math.round(d.temperature_2m_min[i]) + '°'
+        : '—°';
+      var popVal =
+        d.precipitation_probability_max && d.precipitation_probability_max[i] != null
+          ? Math.round(d.precipitation_probability_max[i])
+          : null;
+      var popText = popVal != null && popVal > 0 ? popVal + '%' : '';
+      var icon = '☁️';
+      var c = Number(code);
+      if (c === 0) icon = '☀️';
+      else if (c === 1) icon = '🌤';
+      else if (c === 2) icon = '⛅';
+      else if (c === 3) icon = '☁️';
+      else if (c >= 45 && c <= 48) icon = '🌫';
+      else if (c >= 51 && c <= 67) icon = '🌧';
+      else if (c >= 71 && c <= 77) icon = '❄️';
+      else if (c >= 80 && c <= 82) icon = '🌦';
+      else if (c >= 95) icon = '⛈';
+
+      var name = dayName(d.time[i], i);
+      // Short labels for the long strip
+      if (name === 'Today') name = 'Today';
+      else if (name === 'Tomorrow') name = 'Tom';
+      var condText = String(codeLabel(code) || '').replace(/^[^\w]+/, '').trim();
+      var title = (loc && loc.label ? loc.label + ' · ' : '') + dayName(d.time[i], i) +
+        ' · ' + condText + ' · H ' + hi + ' / L ' + lo +
+        (popText ? ' · rain ' + popText : '');
+
+      html +=
+        '<div class="day-chip' + (i === 0 ? ' is-today' : '') + '" role="listitem" title="' +
+        title.replace(/"/g, '&quot;') + '">' +
+        '<span class="d-name">' + name + '</span>' +
+        '<span class="d-icon" aria-hidden="true">' + icon + '</span>' +
+        '<span class="d-temps"><span class="d-hi">' + hi + '</span> <span class="d-lo">' + lo + '</span></span>' +
+        '<span class="d-pop">' + popText + '</span>' +
+        '</div>';
+    }
+    list.innerHTML = html;
+  }
+
   function renderWeather(loc, data) {
     var c = data.current || {};
     var code = c.weather_code;
@@ -789,15 +1165,19 @@
     var next = codeToMood(code);
     if (isNight && next !== 'rain') next = 'night';
     applyMood(next);
+    renderDaily(loc, data);
   }
   async function fetchWeather(lat, lon) {
     var params = new URLSearchParams({
       latitude: String(lat),
       longitude: String(lon),
-      current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,uv_index,is_day',
+      current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,uv_index,is_day,visibility',
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max',
       temperature_unit: 'fahrenheit',
       wind_speed_unit: 'mph',
+      precipitation_unit: 'inch',
       timezone: 'auto',
+      forecast_days: '10',
     });
     var res = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
     if (!res.ok) throw new Error('Weather request failed');
@@ -817,7 +1197,8 @@
       return name || null;
     } catch (_) { return null; }
   }
-  async function loadAt(lat, lon, label) {
+  async function loadAt(lat, lon, label, opts) {
+    opts = opts || {};
     setStatus('Loading…');
     try {
       if (!label) label = (await reverseLabel(lat, lon)) || (lat.toFixed(2) + '°, ' + lon.toFixed(2) + '°');
@@ -827,10 +1208,312 @@
       try {
         localStorage.setItem('gw_web_loc', JSON.stringify({ lat: lat, lon: lon, label: label }));
       } catch (_) {}
+      // Keep ticker “you” chip in sync with panel location
+      refreshTickerYou({ lat: lat, lon: lon, label: label });
+      // Sync map pin / fog data (same location as the weather panel)
+      if (window.PureSkyMaps) {
+        window.PureSkyMaps.setLocation(
+          { lat: lat, lon: lon, label: label, pinned: !!opts.pinned },
+          { forceView: opts.forceMapView !== false && !opts.fromMap, animate: true }
+        );
+        window.PureSkyMaps.setForecast(data);
+        if (opts.fromMap) {
+          window.PureSkyMaps.updatePinHint(label + ' · pin set');
+        }
+      }
     } catch (e) {
       console.warn(e);
       setStatus('Could not load weather. Try again.', true);
     }
+  }
+
+  /* ---- Top scrolling weather ticker (nearby cities only) ---- */
+  // Regional US + nearby Canada/Mexico hubs — filtered by distance to your place
+  var TICKER_CITIES = [
+    // Louisiana / Gulf South
+    { name: 'New Orleans, LA', lat: 29.95, lon: -90.07 },
+    { name: 'Baton Rouge, LA', lat: 30.45, lon: -91.19 },
+    { name: 'Lafayette, LA', lat: 30.22, lon: -92.02 },
+    { name: 'Shreveport, LA', lat: 32.53, lon: -93.75 },
+    { name: 'Lake Charles, LA', lat: 30.23, lon: -93.22 },
+    { name: 'Monroe, LA', lat: 32.51, lon: -92.12 },
+    { name: 'Alexandria, LA', lat: 31.31, lon: -92.45 },
+    { name: 'Houma, LA', lat: 29.60, lon: -90.72 },
+    // Mississippi / Alabama / Arkansas / Tennessee
+    { name: 'Jackson, MS', lat: 32.30, lon: -90.18 },
+    { name: 'Gulfport, MS', lat: 30.37, lon: -89.09 },
+    { name: 'Hattiesburg, MS', lat: 31.33, lon: -89.29 },
+    { name: 'Mobile, AL', lat: 30.69, lon: -88.04 },
+    { name: 'Birmingham, AL', lat: 33.52, lon: -86.80 },
+    { name: 'Montgomery, AL', lat: 32.37, lon: -86.30 },
+    { name: 'Huntsville, AL', lat: 34.73, lon: -86.59 },
+    { name: 'Little Rock, AR', lat: 34.75, lon: -92.29 },
+    { name: 'Fayetteville, AR', lat: 36.06, lon: -94.16 },
+    { name: 'Fort Smith, AR', lat: 35.39, lon: -94.40 },
+    { name: 'Memphis, TN', lat: 35.15, lon: -90.05 },
+    { name: 'Nashville, TN', lat: 36.16, lon: -86.78 },
+    { name: 'Knoxville, TN', lat: 35.96, lon: -83.92 },
+    // Texas
+    { name: 'Houston, TX', lat: 29.76, lon: -95.37 },
+    { name: 'Dallas, TX', lat: 32.78, lon: -96.80 },
+    { name: 'Austin, TX', lat: 30.27, lon: -97.74 },
+    { name: 'San Antonio, TX', lat: 29.42, lon: -98.49 },
+    { name: 'Beaumont, TX', lat: 30.08, lon: -94.13 },
+    { name: 'Tyler, TX', lat: 32.35, lon: -95.30 },
+    { name: 'El Paso, TX', lat: 31.76, lon: -106.49 },
+    { name: 'Corpus Christi, TX', lat: 27.80, lon: -97.40 },
+    { name: 'Lubbock, TX', lat: 33.58, lon: -101.86 },
+    // Florida / Southeast
+    { name: 'Pensacola, FL', lat: 30.42, lon: -87.22 },
+    { name: 'Tallahassee, FL', lat: 30.44, lon: -84.28 },
+    { name: 'Jacksonville, FL', lat: 30.33, lon: -81.66 },
+    { name: 'Orlando, FL', lat: 28.54, lon: -81.38 },
+    { name: 'Tampa, FL', lat: 27.95, lon: -82.46 },
+    { name: 'Miami, FL', lat: 25.76, lon: -80.19 },
+    { name: 'Atlanta, GA', lat: 33.75, lon: -84.39 },
+    { name: 'Savannah, GA', lat: 32.08, lon: -81.09 },
+    { name: 'Charleston, SC', lat: 32.78, lon: -79.93 },
+    { name: 'Charlotte, NC', lat: 35.23, lon: -80.84 },
+    { name: 'Raleigh, NC', lat: 35.78, lon: -78.64 },
+    // Mid-Atlantic / Northeast
+    { name: 'Washington, DC', lat: 38.91, lon: -77.04 },
+    { name: 'Baltimore, MD', lat: 39.29, lon: -76.61 },
+    { name: 'Philadelphia, PA', lat: 39.95, lon: -75.17 },
+    { name: 'New York, NY', lat: 40.71, lon: -74.01 },
+    { name: 'Boston, MA', lat: 42.36, lon: -71.06 },
+    { name: 'Pittsburgh, PA', lat: 40.44, lon: -79.99 },
+    { name: 'Buffalo, NY', lat: 42.89, lon: -78.88 },
+    // Midwest
+    { name: 'Chicago, IL', lat: 41.88, lon: -87.63 },
+    { name: 'St. Louis, MO', lat: 38.63, lon: -90.20 },
+    { name: 'Kansas City, MO', lat: 39.10, lon: -94.58 },
+    { name: 'Oklahoma City, OK', lat: 35.47, lon: -97.52 },
+    { name: 'Tulsa, OK', lat: 36.15, lon: -95.99 },
+    { name: 'Indianapolis, IN', lat: 39.77, lon: -86.16 },
+    { name: 'Columbus, OH', lat: 39.96, lon: -83.00 },
+    { name: 'Cincinnati, OH', lat: 39.10, lon: -84.51 },
+    { name: 'Detroit, MI', lat: 42.33, lon: -83.05 },
+    { name: 'Milwaukee, WI', lat: 43.04, lon: -87.91 },
+    { name: 'Minneapolis, MN', lat: 44.98, lon: -93.27 },
+    { name: 'Des Moines, IA', lat: 41.59, lon: -93.62 },
+    { name: 'Omaha, NE', lat: 41.26, lon: -95.94 },
+    // Mountain / West
+    { name: 'Denver, CO', lat: 39.74, lon: -104.99 },
+    { name: 'Albuquerque, NM', lat: 35.08, lon: -106.65 },
+    { name: 'Phoenix, AZ', lat: 33.45, lon: -112.07 },
+    { name: 'Tucson, AZ', lat: 32.22, lon: -110.97 },
+    { name: 'Las Vegas, NV', lat: 36.17, lon: -115.14 },
+    { name: 'Salt Lake City, UT', lat: 40.76, lon: -111.89 },
+    { name: 'Boise, ID', lat: 43.62, lon: -116.20 },
+    { name: 'Seattle, WA', lat: 47.61, lon: -122.33 },
+    { name: 'Portland, OR', lat: 45.52, lon: -122.68 },
+    { name: 'San Francisco, CA', lat: 37.77, lon: -122.42 },
+    { name: 'Los Angeles, CA', lat: 34.05, lon: -118.24 },
+    { name: 'San Diego, CA', lat: 32.72, lon: -117.16 },
+    { name: 'Sacramento, CA', lat: 38.58, lon: -121.49 },
+    // Border neighbors only when close
+    { name: 'Toronto, ON', lat: 43.65, lon: -79.38 },
+    { name: 'Montreal, QC', lat: 45.50, lon: -73.57 },
+    { name: 'Vancouver, BC', lat: 49.28, lon: -123.12 },
+    { name: 'Monterrey, MX', lat: 25.69, lon: -100.32 },
+  ];
+  var TICKER_NEAR_MI = 280; // primary radius (~neighboring metros)
+  var TICKER_WIDE_MI = 450; // expand if too few
+  var TICKER_MAX = 14;
+  var tickerItems = []; // { name, lat, lon, temp, cond, isYou }
+
+  function shortCond(code) {
+    var c = Number(code);
+    if (c === 0) return 'Clear';
+    if (c === 1 || c === 2) return 'Partly cloudy';
+    if (c === 3) return 'Cloudy';
+    if (c >= 45 && c <= 48) return 'Fog';
+    if (c >= 51 && c <= 67) return 'Rain';
+    if (c >= 71 && c <= 77) return 'Snow';
+    if (c >= 80 && c <= 82) return 'Showers';
+    if (c >= 95) return 'Storms';
+    return '—';
+  }
+
+  function getSavedLoc() {
+    try {
+      var s = JSON.parse(localStorage.getItem('gw_web_loc') || 'null');
+      if (s && s.lat != null && s.lon != null) return s;
+    } catch (_) {}
+    return null;
+  }
+
+  function shortCityName(label) {
+    if (!label) return 'Your location';
+    return String(label).split(',')[0].trim() || 'Your location';
+  }
+
+  /** Great-circle distance in miles */
+  function milesBetween(lat1, lon1, lat2, lon2) {
+    var R = 3958.8;
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLon = (lon2 - lon1) * toRad;
+    var a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  /**
+   * Pick nearby catalog cities for the ticker (not London/Tokyo/etc.).
+   * Uses your set location; falls back to a short regional list if none.
+   */
+  function nearbyTickerCities(origin) {
+    if (!origin || origin.lat == null || origin.lon == null) {
+      // No location yet — show nothing remote; wait for weather boot
+      return [];
+    }
+    var scored = TICKER_CITIES.map(function (c) {
+      return {
+        name: c.name,
+        fullLabel: c.name,
+        lat: c.lat,
+        lon: c.lon,
+        isYou: false,
+        mi: milesBetween(origin.lat, origin.lon, c.lat, c.lon),
+      };
+    });
+    // Drop the origin city itself (same place)
+    scored = scored.filter(function (c) { return c.mi > 18; });
+    scored.sort(function (a, b) { return a.mi - b.mi; });
+
+    var near = scored.filter(function (c) { return c.mi <= TICKER_NEAR_MI; });
+    if (near.length < 6) {
+      near = scored.filter(function (c) { return c.mi <= TICKER_WIDE_MI; });
+    }
+    // Still sparse (remote / international) — take closest N regardless
+    if (near.length < 4) {
+      near = scored.slice(0, TICKER_MAX);
+    }
+    return near.slice(0, TICKER_MAX);
+  }
+
+  function renderTickerTrack() {
+    var track = document.getElementById('wx-ticker-track');
+    if (!track || !tickerItems.length) return;
+
+    function makeBtn(item, key) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'wx-ticker-item' + (item.isYou ? ' is-you' : '');
+      btn.setAttribute('data-i', String(key));
+      btn.title = 'Show ' + item.name + ' in the weather panel';
+      btn.innerHTML =
+        '<span class="city"></span><span class="temp"></span><span class="cond"></span>';
+      btn.querySelector('.city').textContent = item.name;
+      btn.querySelector('.temp').textContent =
+        item.temp != null ? Math.round(item.temp) + '°' : '—°';
+      btn.querySelector('.cond').textContent = item.cond || '';
+      btn.addEventListener('click', function () {
+        loadAt(item.lat, item.lon, item.fullLabel || item.name);
+        try {
+          document.querySelector('.wx-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (_) {}
+      });
+      return btn;
+    }
+
+    track.innerHTML = '';
+    // Duplicate list for seamless CSS loop (translate -50%)
+    var frag = document.createDocumentFragment();
+    var i;
+    for (i = 0; i < tickerItems.length; i++) frag.appendChild(makeBtn(tickerItems[i], i));
+    for (i = 0; i < tickerItems.length; i++) frag.appendChild(makeBtn(tickerItems[i], i + tickerItems.length));
+    track.appendChild(frag);
+  }
+
+  async function fetchTickerTemps(cities) {
+    if (!cities.length) return [];
+    var lats = cities.map(function (c) { return c.lat; }).join(',');
+    var lons = cities.map(function (c) { return c.lon; }).join(',');
+    var params = new URLSearchParams({
+      latitude: lats,
+      longitude: lons,
+      current: 'temperature_2m,weather_code',
+      temperature_unit: 'fahrenheit',
+      timezone: 'auto',
+    });
+    var res = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
+    if (!res.ok) throw new Error('ticker weather failed');
+    var data = await res.json();
+    // Multi-location: array of results, or single object if length 1
+    var list = Array.isArray(data) ? data : [data];
+    return cities.map(function (city, i) {
+      var block = list[i] || {};
+      var cur = block.current || {};
+      return {
+        name: city.name,
+        fullLabel: city.fullLabel || city.name,
+        lat: city.lat,
+        lon: city.lon,
+        isYou: !!city.isYou,
+        temp: cur.temperature_2m,
+        cond: shortCond(cur.weather_code),
+      };
+    });
+  }
+
+  async function loadTicker() {
+    var track = document.getElementById('wx-ticker-track');
+    if (!track) return;
+
+    var saved = getSavedLoc();
+    var cities = nearbyTickerCities(saved);
+
+    if (saved) {
+      cities.unshift({
+        name: shortCityName(saved.label),
+        fullLabel: saved.label,
+        lat: saved.lat,
+        lon: saved.lon,
+        isYou: true,
+      });
+    }
+
+    if (!cities.length) {
+      track.innerHTML = '';
+      var wait = document.createElement('button');
+      wait.type = 'button';
+      wait.className = 'wx-ticker-item is-loading';
+      wait.textContent = 'Nearby temps appear after your location loads…';
+      track.appendChild(wait);
+      return;
+    }
+
+    try {
+      tickerItems = await fetchTickerTemps(cities);
+      var you = cities.find(function (c) { return c.isYou; }) || cities[0];
+      if (you) lastTickerYouKey = Number(you.lat).toFixed(2) + ',' + Number(you.lon).toFixed(2);
+      renderTickerTrack();
+    } catch (e) {
+      console.warn('ticker', e);
+      track.innerHTML = '';
+      var err = document.createElement('button');
+      err.type = 'button';
+      err.className = 'wx-ticker-item is-err';
+      err.textContent = 'Temps unavailable — try again later';
+      track.appendChild(err);
+    }
+  }
+
+  var lastTickerYouKey = '';
+  var tickerRefreshTimer = null;
+  function refreshTickerYou(loc) {
+    if (!loc) return;
+    var key = Number(loc.lat).toFixed(2) + ',' + Number(loc.lon).toFixed(2);
+    // Same place already on ticker — no full reload (panel already shows temp)
+    if (key === lastTickerYouKey && tickerItems.length) return;
+    lastTickerYouKey = key;
+    clearTimeout(tickerRefreshTimer);
+    // Debounce so rapid panel changes don't spam the API
+    tickerRefreshTimer = setTimeout(loadTicker, 350);
   }
   function getGeo() {
     return new Promise(function (resolve, reject) {
@@ -937,15 +1620,55 @@
       setStatus('Search failed.', true);
     }
   }
+  function fetchWithTimeout(url, opts, ms) {
+    opts = opts || {};
+    ms = ms || 8000;
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () {
+      if (ctrl) ctrl.abort();
+    }, ms);
+    var p = fetch(url, Object.assign({}, opts, ctrl ? { signal: ctrl.signal } : {}));
+    return p.finally(function () { clearTimeout(timer); });
+  }
+
+  /** IP / VPN approximate location via Cloudflare (no browser permission popup) */
+  async function detectVisitorLocation() {
+    try {
+      var res = await fetchWithTimeout('/api/geo', { cache: 'no-store' }, 5000);
+      if (!res.ok) return null;
+      var g = await res.json();
+      if (g && g.lat != null && g.lon != null && !isNaN(Number(g.lat)) && !isNaN(Number(g.lon))) {
+        return {
+          lat: Number(g.lat),
+          lon: Number(g.lon),
+          label: g.label || (g.city || 'Your area'),
+        };
+      }
+    } catch (e) {
+      console.warn('visitor geo', e);
+    }
+    return null;
+  }
+
   async function bootWeather() {
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem('gw_web_loc') || 'null'); } catch (_) {}
+    // Prefer a place the visitor already chose on this browser
     if (saved && saved.lat != null) {
       await loadAt(saved.lat, saved.lon, saved.label);
       return;
     }
-    // Default: Livingston / Baton Rouge area (Geaux)
-    await loadAt(30.5021, -90.7476, 'Livingston, Louisiana');
+    // First visit: use approximate location from their IP (follows VPN)
+    setStatus('Detecting your area…');
+    var detected = await detectVisitorLocation();
+    if (detected) {
+      await loadAt(detected.lat, detected.lon, detected.label);
+      setStatus('Approx. location from your network — use Use my location or search for precision.');
+      return;
+    }
+    // Last resort if geo API unavailable
+    await loadAt(39.5, -98.35, 'United States');
+    setStatus('Could not detect location — search a city or use Use my location.', true);
   }
   function boot() {
     // Geolocation (and the lock icon) require HTTPS
@@ -976,7 +1699,64 @@
       if (mood === 'rain' && Math.random() < 0.12) flashLightning();
     }, 4000);
     bootWeather();
+    loadTicker();
+    // Refresh ticker temps every 20 minutes
+    setInterval(loadTicker, 20 * 60 * 1000);
+    initWebMaps();
   }
+
+  function initWebMaps() {
+    function start() {
+      if (!window.PureSkyMaps || typeof L === 'undefined') {
+        setTimeout(start, 40);
+        return;
+      }
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem('gw_web_loc') || 'null'); } catch (_) {}
+      var loc = saved && saved.lat != null
+        ? { lat: saved.lat, lon: saved.lon, label: saved.label }
+        : { lat: 39.5, lon: -98.35, label: 'United States' };
+
+      window.PureSkyMaps.init(loc, null);
+      // Refine map center once IP geo is known (if no saved place yet)
+      if (!saved) {
+        detectVisitorLocation().then(function (d) {
+          if (d && window.PureSkyMaps) {
+            window.PureSkyMaps.setLocation(
+              { lat: d.lat, lon: d.lon, label: d.label },
+              { forceView: true, animate: true }
+            );
+          }
+        });
+      }
+      window.PureSkyMaps.onPinDrop(function (pin) {
+        loadAt(pin.lat, pin.lon, null, { fromMap: true, pinned: true, forceMapView: false });
+      });
+
+      document.querySelectorAll('.layer-btn[data-layer]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var layer = btn.getAttribute('data-layer');
+          window.PureSkyMaps.setLayer(layer);
+        });
+      });
+
+      // When user jumps to #maps, fix Leaflet size (hidden containers measure 0)
+      function onHash() {
+        if (location.hash === '#maps' && window.PureSkyMaps) {
+          window.PureSkyMaps.onShow();
+        }
+      }
+      window.addEventListener('hashchange', onHash);
+      if (location.hash === '#maps') onHash();
+
+      // Also invalidate once after layout
+      setTimeout(function () {
+        if (window.PureSkyMaps) window.PureSkyMaps.onShow();
+      }, 300);
+    }
+    start();
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

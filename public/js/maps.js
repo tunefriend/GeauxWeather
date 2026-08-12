@@ -1662,7 +1662,7 @@
 
     try {
       if (!eclipseData) {
-        const res = await fetch('data/eclipses.json', { cache: 'no-cache' });
+        const res = await fetch('/data/eclipses.json', { cache: 'no-cache' });
         if (!res.ok) throw new Error('eclipses ' + res.status);
         eclipseData = await res.json();
       }

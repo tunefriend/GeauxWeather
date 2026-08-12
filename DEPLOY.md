@@ -38,5 +38,8 @@ npx wrangler deploy
 
 ## App / F-Droid
 
+- **F-Droid listing:** https://f-droid.org/packages/com.geauxweather.app/
+- Package ID: `com.geauxweather.app`
 - Website field for listings: `https://geauxweather.com`
 - Privacy policy: `https://geauxweather.com/privacy.html`
+- Reproducible builds via fdroiddata metadata (AllowedAPKSigningKeys + Binaries)

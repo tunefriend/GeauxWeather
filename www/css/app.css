@@ -1507,3 +1507,23 @@ button.setting-btn:active {
   opacity: 1;
   padding-top: 4px;
 }
+
+/* Eclipse tracker */
+.eclipse-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.eclipse-pick {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.eclipse-pick.active {
+  background: #7c3aed;
+  border-color: transparent;
+  color: #fff;
+}

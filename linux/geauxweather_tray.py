@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""GeauxWeather tray / mini-panel for GNOME (Debian 13).
+"""GeauxWeather tray / mini-panel for Linux desktops.
 
-Preferred: Ayatana AppIndicator in the top bar.
+Works with any DE that supports AppIndicator / StatusNotifier
+(GNOME, KDE Plasma, XFCE, Cinnamon, MATE, Budgie, LXQt, …).
+
+Preferred: Ayatana AppIndicator in the panel / status area.
 Fallback: small always-on-top panel if AppIndicator GIR is missing.
 """
 
@@ -66,20 +69,22 @@ def load_config() -> dict:
 
 
 def render_temp_icon(temp_text: str, out_path: Path) -> str:
-    """Draw a compact top-bar icon with temperature text."""
+    """Draw temperature as text only on a fully transparent icon (no box fill).
+
+    GNOME/AppIndicator always shows an icon slot. A blank icon becomes a black
+    square; baking the temp into the icon (with no set_label) shows a single
+    clean temperature in the top bar.
+    """
     from PIL import Image, ImageDraw, ImageFont
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    size = 64
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    # Wide enough for "100°"; tall enough for panel scaling
+    w, h = 72, 36
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # dark rounded tile
-    draw.rounded_rectangle((2, 2, size - 3, size - 3), radius=14, fill=(20, 28, 42, 230))
-    draw.rounded_rectangle((2, 2, size - 3, size - 3), radius=14, outline=(100, 160, 230, 200), width=2)
 
-    text = (temp_text or "GW")[:4]
-    # pick font size by length
-    fs = 28 if len(text) <= 2 else (22 if len(text) <= 3 else 18)
+    text = (temp_text or "—").strip()[:4]
+    fs = 26 if len(text) <= 3 else 22
     font = None
     for fp in (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -97,20 +102,17 @@ def render_temp_icon(temp_text: str, out_path: Path) -> str:
 
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = (size - tw) / 2 - bbox[0]
-    y = (size - th) / 2 - bbox[1] - 1
-    draw.text((x, y), text, font=font, fill=(240, 246, 255, 255))
+    x = (w - tw) / 2 - bbox[0]
+    y = (h - th) / 2 - bbox[1]
+    # Soft shadow for contrast on light and dark panels
+    draw.text((x + 1, y + 1), text, font=font, fill=(0, 0, 0, 160))
+    draw.text((x, y), text, font=font, fill=(245, 248, 255, 255))
     img.save(out_path, "PNG")
     return str(out_path)
 
 
 def find_icon() -> str:
-    for p in (
-        SCRIPT_DIR / "icons" / "geauxweather.png",
-        Path.home() / ".local/share/geauxweather-widget/icons/geauxweather.png",
-    ):
-        if p.is_file():
-            return str(p)
+    """Theme fallback if Pillow is missing."""
     return "weather-few-clouds"
 
 
@@ -237,7 +239,15 @@ class IndicatorUI:
     def __init__(self, model: WeatherModel) -> None:
         assert AppIndicator3 is not None
         self.model = model
-        icon = find_icon()
+        self._icon_dir = Path.home() / ".cache" / "geauxweather-widget"
+        self._icon_dir.mkdir(parents=True, exist_ok=True)
+        # Initial icon path (updated on each sync; unique name forces panel refresh)
+        self._icon_path = self._icon_dir / "tray-temp.png"
+        try:
+            icon = render_temp_icon(model.short, self._icon_path)
+        except Exception:
+            icon = find_icon()
+
         self.indicator = AppIndicator3.Indicator.new(
             "geauxweather-widget",
             icon,
@@ -247,9 +257,15 @@ class IndicatorUI:
             self.indicator.set_icon_full(icon, "GeauxWeather")
         except Exception:
             pass
+        # Never show a separate text label next to the icon (causes double / black box)
+        try:
+            self.indicator.set_label("", "")
+        except Exception:
+            pass
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
         self.indicator.set_title("GeauxWeather")
 
+        # Compact tray menu (stays near the panel — not a floating center window)
         self.menu = Gtk.Menu()
         self.item_status = Gtk.MenuItem(label=model.summary)
         self.item_status.set_sensitive(False)
@@ -266,10 +282,11 @@ class IndicatorUI:
 
         self.menu.append(Gtk.SeparatorMenuItem())
         quit_item = Gtk.MenuItem(label="Quit")
-        quit_item.connect("activate", lambda *_: Gtk.main_quit())
+        quit_item.connect("activate", lambda *_: request_quit())
         self.menu.append(quit_item)
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
+        # Middle-click / secondary: open site (not a second window)
         try:
             self.indicator.set_secondary_activate_target(open_item)
         except Exception:
@@ -278,20 +295,23 @@ class IndicatorUI:
         self.sync()
 
     def sync(self) -> None:
-        # GNOME often hides tray labels — bake temp into the icon
-        icon_path = Path.home() / ".cache" / "geauxweather-widget" / "tray-icon.png"
+        # Single panel entry: temperature drawn on transparent icon, no label
         try:
-            path = render_temp_icon(self.model.short, icon_path)
-            self.indicator.set_icon_full(path, "GeauxWeather")
+            # Unique filename so the panel reloads the image when temp changes
+            safe = "".join(ch if ch.isalnum() or ch in ".-" else "_" for ch in self.model.short)
+            path = self._icon_dir / f"tray-{safe}.png"
+            rendered = render_temp_icon(self.model.short, path)
+            self.indicator.set_icon_full(rendered, self.model.summary or "GeauxWeather")
+            # Drop any leftover label from older builds
+            try:
+                self.indicator.set_label("", "")
+            except Exception:
+                pass
         except Exception:
             try:
                 self.indicator.set_icon(find_icon())
             except Exception:
                 pass
-        try:
-            self.indicator.set_label(self.model.short, "GeauxWeather")
-        except Exception:
-            pass
         self.indicator.set_title(self.model.summary)
         self.item_status.set_label(self.model.summary)
 
@@ -349,7 +369,7 @@ class PanelUI:
         refresh_btn = Gtk.Button(label="↻")
         refresh_btn.connect("clicked", lambda *_: model.refresh())
         quit_btn = Gtk.Button(label="✕")
-        quit_btn.connect("clicked", lambda *_: Gtk.main_quit())
+        quit_btn.connect("clicked", lambda *_: request_quit())
         btn_row.pack_start(open_btn, True, True, 0)
         btn_row.pack_start(refresh_btn, False, False, 0)
         btn_row.pack_start(quit_btn, False, False, 0)
@@ -377,41 +397,61 @@ class PanelUI:
         self.lbl_sub.set_text(self.model.summary)
 
 
+_LOCK = Path.home() / ".cache" / "geauxweather-widget.lock"
+_quitting = False
+
+
+def clear_lock() -> None:
+    try:
+        _LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def request_quit(*_a) -> None:
+    """Quit from menu/button — always drop the lock so the app menu can start again."""
+    global _quitting
+    if _quitting:
+        return
+    _quitting = True
+    clear_lock()
+    Gtk.main_quit()
+
+
 def main() -> int:
     if "--open" in sys.argv:
         open_url(WEBSITE)
         return 0
 
-    lock = Path.home() / ".cache" / "geauxweather-widget.lock"
-    lock.parent.mkdir(parents=True, exist_ok=True)
+    _LOCK.parent.mkdir(parents=True, exist_ok=True)
 
     def take_lock() -> bool:
         try:
-            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            fd = os.open(str(_LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
             os.write(fd, str(os.getpid()).encode())
             os.close(fd)
             return True
         except FileExistsError:
             try:
-                old = int(lock.read_text().strip())
+                old = int(_LOCK.read_text().strip())
                 os.kill(old, 0)
-                # Already in tray — open website instead of doing nothing
+                # Already in tray — open website instead of a second tray
                 print(f"Already running (pid {old}); opening website")
                 open_url(WEBSITE)
                 return False
             except (ValueError, OSError, ProcessLookupError):
-                lock.unlink(missing_ok=True)
+                # Stale lock from a crashed/old process
+                clear_lock()
                 return take_lock()
 
     if not take_lock():
         return 0
 
-    def cleanup(*_a):
-        lock.unlink(missing_ok=True)
-        Gtk.main_quit()
+    import atexit
 
-    signal.signal(signal.SIGINT, cleanup)
-    signal.signal(signal.SIGTERM, cleanup)
+    atexit.register(clear_lock)
+    signal.signal(signal.SIGINT, request_quit)
+    signal.signal(signal.SIGTERM, request_quit)
 
     model = WeatherModel()
     if AppIndicator3 is not None:
@@ -427,7 +467,7 @@ def main() -> int:
     model.refresh()
     GLib.timeout_add_seconds(REFRESH_SECONDS, lambda: (model.refresh() or True))
     Gtk.main()
-    lock.unlink(missing_ok=True)
+    clear_lock()
     return 0
 
 
