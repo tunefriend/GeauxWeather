@@ -1456,7 +1456,6 @@
   // ─── Solar eclipse tracker ─────────────────────────────────────────────
 
   function clearEclipse() {
-    eclipseFetchId++;
     if (eclipseLayerGroup && map) {
       map.removeLayer(eclipseLayerGroup);
       eclipseLayerGroup = null;
@@ -1493,7 +1492,8 @@
     }
   }
 
-  function drawEclipse(selectedId) {
+  function drawEclipse(selectedId, opts) {
+    opts = opts || {};
     const m = ensureMap();
     if (!m || !eclipseData) return;
     const catalog = eclipseData.catalog || [];
@@ -1504,94 +1504,96 @@
     }
     eclipseSelectedId = selectedId;
 
-    if (eclipseLayerGroup) {
-      m.removeLayer(eclipseLayerGroup);
-      eclipseLayerGroup = null;
-    }
+    clearEclipse();
     eclipseLayerGroup = L.layerGroup();
     const bounds = [];
+    let drawn = 0;
 
     for (let i = 0; i < eclipses.length; i++) {
       const pack = eclipses[i];
+      // Each pack is a FeatureCollection with its own properties.id
       const props = pack.properties || {};
-      const active = !selectedId || props.id === selectedId;
-      if (!active) continue;
+      if (selectedId && props.id && props.id !== selectedId) continue;
 
-      const color = props.color || '#7c3aed';
+      const color = props.color || '#a855f7';
       const feats = pack.features || [];
+
       for (let f = 0; f < feats.length; f++) {
         const feat = feats[f];
         const kind = (feat.properties && feat.properties.kind) || '';
         const geom = feat.geometry;
         if (!geom) continue;
 
+        const popupHtml =
+          '<div class="storm-popup-title">🌑 ' +
+          escapeHtml(props.name || 'Solar eclipse') +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(formatEclipseDate(props.date)) +
+          ' · ' +
+          escapeHtml(String(props.type || 'total')) +
+          '</div>' +
+          '<div class="storm-popup-meta" style="margin-top:6px">' +
+          escapeHtml(props.description || '') +
+          '</div>' +
+          (props.nasa
+            ? '<div class="storm-popup-meta" style="margin-top:6px"><a href="' +
+              escapeHtml(props.nasa) +
+              '" target="_blank" rel="noopener">NASA eclipse map</a></div>'
+            : '');
+
         if (kind === 'totality' && geom.type === 'Polygon') {
-          // GeoJSON is [lon, lat] → Leaflet needs [lat, lon]
-          const rings = geom.coordinates.map(function (ring) {
-            return ring.map(function (c) {
-              return [c[1], c[0]];
-            });
+          // Outer ring only: array of [lat, lon]
+          const outer = (geom.coordinates[0] || []).map(function (c) {
+            return [c[1], c[0]];
           });
-          const poly = L.polygon(rings, {
+          if (outer.length < 3) continue;
+          const poly = L.polygon(outer, {
             color: color,
-            weight: 2,
-            opacity: 0.95,
+            weight: 3,
+            opacity: 1,
             fillColor: color,
-            fillOpacity: 0.28,
+            fillOpacity: 0.4,
+            interactive: true,
           });
-          const p = feat.properties || {};
-          poly.bindPopup(
-            '<div class="storm-popup-title">🌑 ' +
-              escapeHtml(p.name || props.name || 'Solar eclipse') +
-              '</div>' +
-              '<div class="storm-popup-meta">' +
-              escapeHtml(formatEclipseDate(p.date || props.date)) +
-              ' · ' +
-              escapeHtml((p.type || props.type || 'total') + '') +
-              '</div>' +
-              '<div class="storm-popup-meta" style="margin-top:6px">' +
-              escapeHtml(p.description || props.description || '') +
-              '</div>' +
-              (props.nasa
-                ? '<div class="storm-popup-meta" style="margin-top:6px"><a href="' +
-                  escapeHtml(props.nasa) +
-                  '" target="_blank" rel="noopener">NASA eclipse map</a></div>'
-                : ''),
-            { maxWidth: 280 }
-          );
+          poly.bindPopup(popupHtml, { maxWidth: 300 });
           eclipseLayerGroup.addLayer(poly);
-          rings[0].forEach(function (ll) {
+          outer.forEach(function (ll) {
             bounds.push(ll);
           });
+          drawn++;
         } else if (kind === 'centerline' && geom.type === 'LineString') {
           const latlngs = geom.coordinates.map(function (c) {
             return [c[1], c[0]];
           });
+          if (latlngs.length < 2) continue;
           const line = L.polyline(latlngs, {
-            color: '#f8fafc',
-            weight: 2.5,
-            opacity: 0.9,
-            dashArray: '6 8',
+            color: '#ffffff',
+            weight: 3,
+            opacity: 0.95,
+            dashArray: '8 6',
           });
+          line.bindPopup(popupHtml, { maxWidth: 300 });
           eclipseLayerGroup.addLayer(line);
           latlngs.forEach(function (ll) {
             bounds.push(ll);
           });
+          drawn++;
         }
       }
     }
 
     eclipseLayerGroup.addTo(m);
-    if (bounds.length && !userExploring) {
+
+    // Always zoom to the path when opening Eclipse or switching date
+    if (bounds.length && opts.fit !== false) {
       try {
-        m.fitBounds(bounds, { padding: [40, 40], maxZoom: 5, animate: true });
-        userExploring = true;
+        m.fitBounds(bounds, { padding: [36, 36], maxZoom: 4, animate: true });
       } catch (e) {
         /* ignore */
       }
     }
 
-    // Info panel + eclipse picker
     const info = $('map-info');
     const legend = $('map-legend');
     const sel =
@@ -1599,52 +1601,60 @@
         return c.id === eclipseSelectedId;
       }) || pickDefaultEclipse(catalog);
 
-    if (info && sel) {
+    if (info) {
       info.classList.remove('hidden');
-      let chips = '';
-      for (let i = 0; i < catalog.length; i++) {
-        const c = catalog[i];
-        const on = c.id === sel.id;
-        chips +=
-          '<button type="button" class="eclipse-pick' +
-          (on ? ' active' : '') +
-          '" data-eclipse-id="' +
-          escapeHtml(c.id) +
-          '">' +
-          escapeHtml(c.date) +
-          '</button>';
-      }
-      info.innerHTML =
-        '<div class="map-info-title">Solar eclipse tracker</div>' +
-        '<div class="map-info-value" style="font-size:1.05rem">' +
-        escapeHtml(sel.name) +
-        '</div>' +
-        '<p class="muted small">' +
-        escapeHtml(formatEclipseDate(sel.date)) +
-        ' · path of totality (approx.)</p>' +
-        '<p class="muted small">' +
-        escapeHtml(sel.description || '') +
-        '</p>' +
-        '<div class="eclipse-picks">' +
-        chips +
-        '</div>' +
-        (sel.nasa
-          ? '<p class="muted small" style="margin-top:8px"><a href="' +
-            escapeHtml(sel.nasa) +
-            '" target="_blank" rel="noopener">Open NASA map for exact times</a></p>'
-          : '') +
-        '<p class="muted small">Never look at the Sun without certified eclipse glasses.</p>';
+      if (!sel) {
+        info.innerHTML =
+          '<div class="map-info-title">Eclipse</div>' +
+          '<p class="muted">No eclipse data in catalog</p>';
+      } else {
+        let chips = '';
+        for (let i = 0; i < catalog.length; i++) {
+          const c = catalog[i];
+          const on = c.id === sel.id;
+          chips +=
+            '<button type="button" class="eclipse-pick' +
+            (on ? ' active' : '') +
+            '" data-eclipse-id="' +
+            escapeHtml(c.id) +
+            '">' +
+            escapeHtml(c.date) +
+            '</button>';
+        }
+        info.innerHTML =
+          '<div class="map-info-title">Solar eclipse tracker</div>' +
+          '<div class="map-info-value" style="font-size:1.05rem">' +
+          escapeHtml(sel.name) +
+          '</div>' +
+          '<p class="muted small">' +
+          escapeHtml(formatEclipseDate(sel.date)) +
+          ' · colored band = path of totality</p>' +
+          '<p class="muted small">' +
+          escapeHtml(sel.description || '') +
+          '</p>' +
+          '<div class="eclipse-picks">' +
+          chips +
+          '</div>' +
+          (sel.nasa
+            ? '<p class="muted small" style="margin-top:8px"><a href="' +
+              escapeHtml(sel.nasa) +
+              '" target="_blank" rel="noopener">NASA map (exact times)</a></p>'
+            : '') +
+          '<p class="muted small">Never look at the Sun without certified eclipse glasses.' +
+          (drawn ? '' : ' (path failed to draw — try another date)') +
+          '</p>';
 
-      info.querySelectorAll('.eclipse-pick').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          userExploring = false;
-          drawEclipse(btn.getAttribute('data-eclipse-id'));
+        info.querySelectorAll('.eclipse-pick').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            drawEclipse(btn.getAttribute('data-eclipse-id'), { fit: true });
+          });
         });
-      });
+      }
     }
     if (legend) {
-      legend.textContent =
-        'Purple/colored band = path of totality · dashed = centerline · NASA data (approx.)';
+      legend.textContent = drawn
+        ? 'Colored band = path of totality · white dashed = centerline'
+        : 'Eclipse path not drawn — try another date chip';
     }
   }
 
@@ -1661,19 +1671,22 @@
     }
 
     try {
-      if (!eclipseData) {
-        const res = await fetch('data/eclipses.json', { cache: 'no-cache' });
-        if (!res.ok) throw new Error('eclipses ' + res.status);
-        eclipseData = await res.json();
-      }
+      // Always revalidate so SW/cache updates ship
+      const res = await fetch('data/eclipses.json?v=2', { cache: 'no-cache' });
+      if (!res.ok) throw new Error('eclipses ' + res.status);
+      eclipseData = await res.json();
       if (myId !== eclipseFetchId || currentLayer !== 'eclipse') return;
-      drawEclipse(eclipseSelectedId);
+      // Fresh layer open → always fly to the path
+      drawEclipse(eclipseSelectedId, { fit: true });
     } catch (err) {
       console.warn('Eclipse load failed', err);
       if (info) {
         info.innerHTML =
           '<div class="map-info-title">Eclipse</div>' +
-          '<p class="muted">Could not load eclipse paths</p>';
+          '<p class="muted">Could not load eclipse paths</p>' +
+          '<p class="muted small">' +
+          escapeHtml(String((err && err.message) || err || '')) +
+          '</p>';
       }
       if (legend) legend.textContent = 'Eclipse data unavailable';
     }
@@ -1722,6 +1735,12 @@
       loadTornadoes();
     } else if (currentLayer === 'eclipse') {
       setControlsVisible(false);
+      // Drop leftover wind/fog info immediately
+      const info = $('map-info');
+      if (info) {
+        info.classList.remove('hidden');
+        info.innerHTML = '<p class="muted">Loading solar eclipse tracker…</p>';
+      }
       loadEclipses();
     } else {
       // fog

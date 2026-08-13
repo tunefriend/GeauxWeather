@@ -45,9 +45,13 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
+  /* Let Android Font size / Display size scale rem via WebView textZoom */
+  font-size: 100%;
   line-height: 1.4;
   overflow: hidden;
+  /* Prefer system text metrics; avoid clipping when scaled */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #app {
@@ -440,9 +444,9 @@ body.sky-mood-default {
   opacity: 0;
 }
 
-/* Header — compact + fixed footprint (no vertical jump) */
+/* Header — flexible height so large system fonts are not clipped */
 .header {
-  padding: calc(4px + var(--safe-top)) 10px 4px;
+  padding: calc(4px + var(--safe-top)) 10px 6px;
   background: rgba(11, 15, 20, 0.72);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -450,13 +454,12 @@ body.sky-mood-default {
 }
 
 .brand-name {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--accent);
-  line-height: 12px;
-  height: 12px;
-  margin: 0 2px 0;
+  line-height: 1.25;
+  margin: 0 2px 2px;
   opacity: 0.9;
 }
 
@@ -464,7 +467,7 @@ body.sky-mood-default {
   display: flex;
   align-items: center;
   gap: 0;
-  height: 36px;
+  min-height: 2.25rem;
 }
 
 .loc-name {
@@ -472,10 +475,13 @@ body.sky-mood-default {
   min-width: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  line-height: 1.15;
-  white-space: nowrap;
+  line-height: 1.25;
+  /* Allow 2 lines when font/display size is large */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .icon-btn {
@@ -496,8 +502,8 @@ body.sky-mood-default {
 }
 
 .header .header-icon {
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
   padding: 4px;
   font-size: 1.1rem;
 }
@@ -507,14 +513,15 @@ body.sky-mood-default {
 }
 
 .status {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
-  margin: 0 2px;
-  height: 14px;
-  line-height: 14px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  margin: 2px 2px 0;
+  min-height: 1.15em;
+  line-height: 1.3;
+  /* Never clip "Updated …" into "Undated …" */
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* Screens */
@@ -535,37 +542,37 @@ body.sky-mood-default {
   display: block;
 }
 
-/* Today — even vertical rhythm, no extra 3-day block */
+/* Today — flexible so large Font size / Display size does not overlap */
 .current {
   text-align: center;
-  padding: 18px 0 14px;
+  padding: 14px 0 12px;
 }
 
 .sun-times {
   display: flex;
   justify-content: center;
-  gap: 28px;
-  margin: 16px auto 0;
-  max-width: 280px;
-  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: 14px auto 0;
+  max-width: 100%;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  min-height: 52px;
   box-sizing: border-box;
 }
 .sun-time {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 80px;
+  min-width: 4.5rem;
 }
 .sun-label {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 .sun-value {
   font-size: 1rem;
@@ -573,60 +580,71 @@ body.sky-mood-default {
   font-variant-numeric: tabular-nums;
   color: var(--text);
   line-height: 1.3;
-  min-height: 1.3em;
 }
 
 .temp-now {
-  font-size: 5rem;
+  /* Scales down when system text is large so it does not crush condition text */
+  font-size: clamp(2.75rem, 18vw, 5rem);
   font-weight: 200;
-  letter-spacing: -2px;
-  line-height: 1;
-  height: 5rem;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  height: auto;
+  min-height: 0;
   color: var(--temp);
+  overflow: visible;
 }
 
 .cond-now {
-  font-size: 1.15rem;
-  margin-top: 6px;
-  min-height: 1.4em;
+  font-size: 1.1rem;
+  margin-top: 0.35rem;
+  min-height: 0;
   line-height: 1.35;
   color: var(--text);
+  padding: 0 8px;
+  word-break: break-word;
 }
 
 .feels {
   font-size: 0.95rem;
   color: var(--text-muted);
-  margin-top: 4px;
-  min-height: 1.25em;
-  line-height: 1.25;
+  margin-top: 0.25rem;
+  min-height: 0;
+  line-height: 1.3;
+  padding: 0 8px;
 }
 
 /* Metrics grid */
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 18px 0 16px;
+  gap: 8px;
+  margin: 16px 0 14px;
 }
 
 .metric {
   background: var(--surface);
   border-radius: 12px;
-  padding: 12px 8px;
+  padding: 10px 6px;
   text-align: center;
+  min-width: 0;
 }
 
 .metric-label {
   font-size: 0.68rem;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .metric-value {
-  font-size: 1.02rem;
+  font-size: 0.95rem;
   font-weight: 600;
   margin-top: 4px;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Hourly */
@@ -646,33 +664,46 @@ body.sky-mood-default {
 
 .hourly {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
   padding-bottom: 8px;
   -webkit-overflow-scrolling: touch;
 }
 
 .hour-card {
-  flex: 0 0 62px;
+  /* Wider cards so "12 PM" does not wrap under large font sizes */
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  width: max-content;
+  max-width: 6.5rem;
   background: var(--surface);
   border-radius: 12px;
-  padding: 10px 6px;
+  padding: 10px 8px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .hour-time {
   font-size: 0.72rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .hour-temp {
   font-size: 1.05rem;
   font-weight: 600;
-  margin: 5px 0 3px;
+  margin: 2px 0;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 
 .hour-icon {
   font-size: 1.15rem;
+  line-height: 1.2;
 }
 
 /* 10-Day */
@@ -816,8 +847,9 @@ button.setting-btn:active {
   right: 0;
   max-width: 480px;
   margin: 0 auto;
-  height: calc(var(--nav-h) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
+  min-height: calc(var(--nav-h) + var(--safe-bottom));
+  height: auto;
+  padding: 4px 0 var(--safe-bottom);
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: flex;
@@ -826,6 +858,7 @@ button.setting-btn:active {
 
 .nav-btn {
   flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -833,10 +866,10 @@ button.setting-btn:active {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   font-size: 0.65rem;
   cursor: pointer;
-  padding-top: 4px;
+  padding: 6px 2px 4px;
 }
 
 .nav-btn.active {
@@ -851,7 +884,8 @@ button.setting-btn:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 1.25rem;
+  min-height: 1.25rem;
+  height: auto;
 }
 .nav-icon-img img {
   width: 20px;
@@ -865,6 +899,18 @@ button.setting-btn:active {
 }
 .bottom-nav .nav-label {
   font-size: 0.62rem;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Extra breathing room under large system text */
+@media (min-resolution: 1dppx) {
+  #screens {
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 1.25rem);
+  }
 }
 
 /* Utility */
@@ -1100,8 +1146,10 @@ button.setting-btn:active {
 .hour-pop {
   font-size: 0.7rem;
   color: var(--accent);
-  margin-top: 2px;
+  margin-top: 1px;
   min-height: 1em;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .hour-pop.dim {
   color: var(--text-muted);
@@ -1115,7 +1163,8 @@ button.setting-btn:active {
 .day-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   width: 100%;
   background: var(--surface);
   border: none;
@@ -1135,29 +1184,32 @@ button.setting-btn:active {
 }
 
 .day-name {
-  width: 42px;
+  min-width: 2.6rem;
+  width: auto;
   font-weight: 600;
   font-size: 0.95rem;
   flex-shrink: 0;
 }
 .day-icon {
   font-size: 1.3rem;
-  width: 28px;
+  width: 1.75rem;
   text-align: center;
   flex-shrink: 0;
 }
 .day-pop {
-  width: 36px;
+  min-width: 2rem;
+  width: auto;
   font-size: 0.8rem;
   color: var(--accent);
   flex-shrink: 0;
 }
 .day-temps {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   font-variant-numeric: tabular-nums;
+  min-width: 4rem;
 }
 .day-high { font-weight: 600; }
 .day-low { color: var(--text-muted); }

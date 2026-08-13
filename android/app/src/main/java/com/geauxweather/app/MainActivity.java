@@ -20,8 +20,11 @@ package com.geauxweather.app;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -35,6 +38,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GeauxWeatherNativePlugin.class);
         super.onCreate(savedInstanceState);
+        applySystemTextZoom();
         requestNotifPermissionIfNeeded();
         GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
@@ -47,10 +51,37 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        applySystemTextZoom();
         GeauxWeatherWidgetProvider.refreshAll(this);
         WeatherNotificationHelper.update(this);
         if (HurricaneAlertHelper.isEnabled(this)) {
             new Thread(() -> HurricaneAlertHelper.check(this, false)).start();
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Font size / Display size changed in system settings
+        applySystemTextZoom();
+    }
+
+    /**
+     * Honor Android Settings → Display size & text (fontScale).
+     * Without this, fixed layout boxes clip text (e.g. "Updated" → "Undated").
+     */
+    private void applySystemTextZoom() {
+        try {
+            if (getBridge() == null || getBridge().getWebView() == null) return;
+            WebView webView = getBridge().getWebView();
+            WebSettings settings = webView.getSettings();
+            float fontScale = getResources().getConfiguration().fontScale;
+            if (fontScale <= 0f) fontScale = 1f;
+            // Cap extreme scales so the UI stays usable; layout still flexes via CSS
+            float zoom = Math.min(Math.max(fontScale, 0.85f), 1.6f) * 100f;
+            settings.setTextZoom(Math.round(zoom));
+        } catch (Exception ignored) {
+            // Bridge may not be ready yet
         }
     }
 

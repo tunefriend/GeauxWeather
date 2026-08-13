@@ -1,5 +1,5 @@
 /* GeauxWeather service worker — cache app shell only; always network for APIs */
-const CACHE = "geauxweather-shell-v2";
+const CACHE = "geauxweather-shell-v3";
 const SHELL = [
   "/",
   "/home-v3.html",

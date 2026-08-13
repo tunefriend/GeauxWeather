@@ -1,0 +1,4 @@
+• Fix layout with Android Font size and Display size (accessibility)
+• Stop clipping "Updated …" and overlapping temperature / condition text
+• Wider hourly cards so times stay on one line
+• Honor system text scale in the WebView

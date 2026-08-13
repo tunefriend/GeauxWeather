@@ -327,7 +327,13 @@
     const cards = [];
     for (let i = start; i < Math.min(start + 24, h.time.length); i++) {
       const t = new Date(h.time[i]);
-      const label = i === start ? 'Now' : t.toLocaleTimeString([], { hour: 'numeric' });
+      // Compact hour labels (avoid wrap under large Android font/display sizes)
+      let label = 'Now';
+      if (i !== start) {
+        const h12 = t.getHours() % 12 || 12;
+        const ap = t.getHours() < 12 ? 'a' : 'p';
+        label = h12 + ap;
+      }
       const cond = W.codeToCondition(h.weather_code[i]);
       const pop =
         h.precipitation_probability && h.precipitation_probability[i] != null
