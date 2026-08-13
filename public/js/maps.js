@@ -459,6 +459,11 @@
 
   // ─── Wind field (Open-Meteo grid + particles) ───────────────────────────
 
+  function windUnits() {
+    return localStorage.getItem('units') === 'metric' ? 'metric' : 'imperial';
+  }
+
+  /** Color scale is defined in mph for consistent appearance across unit settings. */
   function windColor(speedMph) {
     if (speedMph < 5) return '#7ec8e3';
     if (speedMph < 10) return '#5b9fd4';
@@ -467,6 +472,11 @@
     if (speedMph < 35) return '#e89a3c';
     if (speedMph < 50) return '#e85d4c';
     return '#c44dff';
+  }
+
+  function toMph(speed, units) {
+    if (speed == null || isNaN(speed)) return 0;
+    return units === 'metric' ? Number(speed) * 0.621371 : Number(speed);
   }
 
   /** Meteorological from-direction deg → CSS rotation so arrow points where wind goes */
@@ -529,7 +539,7 @@
   }
 
   function makeWindArrowIcon(speedMph, fromDeg) {
-    const color = windColor(speedMph);
+    const color = windColor(toMph(speedMph, 'imperial'));
     const rot = windToCssDeg(fromDeg);
     // Arrow points up; CSS rotates to wind-to direction
     const html =
@@ -695,6 +705,8 @@
     if (!m || currentLayer !== 'wind') return;
     const myId = ++windFetchId;
     const legend = $('map-legend');
+    const units = windUnits();
+    const windApiUnit = units === 'metric' ? 'kmh' : 'mph';
     if (legend) legend.textContent = 'Loading wind…';
 
     try {
@@ -707,7 +719,8 @@
         '&longitude=' +
         grid.lons.join(',') +
         '&current=wind_speed_10m,wind_direction_10m' +
-        '&wind_speed_unit=mph';
+        '&wind_speed_unit=' +
+        windApiUnit;
 
       const res = await fetch(url);
       if (!res.ok) throw new Error('Open-Meteo ' + res.status);
@@ -722,7 +735,14 @@
         const lon = row.longitude != null ? row.longitude : grid.lons[i];
         const speed = c.wind_speed_10m != null ? c.wind_speed_10m : 0;
         const dir = c.wind_direction_10m != null ? c.wind_direction_10m : 0;
-        samples.push({ lat: lat, lon: lon, speedMph: speed, dir: dir });
+        samples.push({
+          lat: lat,
+          lon: lon,
+          speedMph: toMph(speed, units),
+          speed: speed,
+          units: units,
+          dir: dir,
+        });
       }
 
       if (myId !== windFetchId || currentLayer !== 'wind') return;
@@ -752,15 +772,27 @@
 
       updateWindPinLegend();
       if (legend) {
-        legend.innerHTML =
-          'Wind · Open-Meteo · ' +
-          '<span class="wind-legend-scale">' +
-          swatch('#7ec8e3', '<5') +
-          swatch('#5b9fd4', '10') +
-          swatch('#3dcc8c', '15') +
-          swatch('#f0c14a', '25') +
-          swatch('#e85d4c', '35+') +
-          ' mph</span>';
+        if (units === 'metric') {
+          legend.innerHTML =
+            'Wind · Open-Meteo · ' +
+            '<span class="wind-legend-scale">' +
+            swatch('#7ec8e3', '<8') +
+            swatch('#5b9fd4', '16') +
+            swatch('#3dcc8c', '24') +
+            swatch('#f0c14a', '40') +
+            swatch('#e85d4c', '56+') +
+            ' km/h</span>';
+        } else {
+          legend.innerHTML =
+            'Wind · Open-Meteo · ' +
+            '<span class="wind-legend-scale">' +
+            swatch('#7ec8e3', '<5') +
+            swatch('#5b9fd4', '10') +
+            swatch('#3dcc8c', '15') +
+            swatch('#f0c14a', '25') +
+            swatch('#e85d4c', '35+') +
+            ' mph</span>';
+        }
       }
     } catch (err) {
       console.warn('Wind field failed', err);

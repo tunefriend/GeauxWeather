@@ -1,0 +1,2 @@
+• Wind map legend uses km/h when units are metric (not always mph)
+• Color scale labels match the selected unit system
