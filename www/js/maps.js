@@ -65,6 +65,14 @@
   let eclipseData = null;
   let eclipseSelectedId = null;
 
+  // Mississippi river stages (USGS)
+  let riverLayerGroup = null;
+  let riverFetchId = 0;
+
+  // Lightning / thunderstorm activity near location
+  let lightningLayerGroup = null;
+  let lightningFetchId = 0;
+
   // RainViewer free tiles support zoom 0–7 only (higher shows "Zoom Level Not Supported")
   const RADAR_MAX_ZOOM = 7;
   const DEFAULT_ZOOM = 6;
@@ -284,8 +292,8 @@
       const legend = $('map-legend');
       if (legend) {
         legend.textContent = playing
-          ? 'Playing radar · RainViewer'
-          : 'Tap map to pin · RainViewer';
+          ? 'Playing rain & snow radar · RainViewer'
+          : 'Rain & snow · RainViewer · tap map to pin';
       }
     }
   }
@@ -317,6 +325,7 @@
   }
 
   function radarUrl(frame) {
+    // RainViewer: color=2, options={smooth}_{snow} → 1_1 = smoothed + snow colors
     return (
       'https://tilecache.rainviewer.com' +
       frame.path +
@@ -1726,6 +1735,776 @@
     }
   }
 
+  // ─── Mississippi River stages (USGS) ───────────────────────────────────
+
+  // Major main-stem Mississippi River gauges (MN → Gulf)
+  // floodFt = NWS minor flood stage (ft) where commonly published; null if unknown
+  const MS_RIVER_SITES = [
+    { id: '05331000', name: 'St. Paul, MN', floodFt: 14 },
+    { id: '05355200', name: 'Hastings, MN', floodFt: 15 },
+    { id: '05378500', name: 'Winona, MN', floodFt: 13 },
+    { id: '05389500', name: 'McGregor, IA', floodFt: 16 },
+    { id: '05420500', name: 'Clinton, IA', floodFt: 16 },
+    { id: '05587450', name: 'Grafton, IL', floodFt: 18 },
+    { id: '07010000', name: 'St. Louis, MO', floodFt: 30 },
+    { id: '07022000', name: 'Thebes, IL', floodFt: 33 },
+    { id: '07024175', name: 'New Madrid, MO', floodFt: 34 },
+    { id: '07032000', name: 'Memphis, TN', floodFt: 34 },
+    { id: '07289000', name: 'Vicksburg, MS', floodFt: 43 },
+    { id: '07374000', name: 'Baton Rouge, LA', floodFt: 35 },
+    { id: '07374525', name: 'Belle Chasse, LA', floodFt: 10 },
+  ];
+
+  const MS_FLOOD = {};
+  MS_RIVER_SITES.forEach(function (s) {
+    if (s.floodFt != null) MS_FLOOD[s.id] = s.floodFt;
+  });
+
+  function clearRivers() {
+    riverFetchId++;
+    if (riverLayerGroup && map) {
+      map.removeLayer(riverLayerGroup);
+      riverLayerGroup = null;
+    }
+  }
+
+  function haversineMi(lat1, lon1, lat2, lon2) {
+    const R = 3958.8;
+    const toR = Math.PI / 180;
+    const dLat = (lat2 - lat1) * toR;
+    const dLon = (lon2 - lon1) * toR;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toR) *
+        Math.cos(lat2 * toR) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  /**
+   * Rising / falling from recent USGS stage samples.
+   * samples: [{t: ms, v: ft}, ...] chronological
+   */
+  function riverTrend(samples) {
+    if (!samples || samples.length < 2) {
+      return { key: 'unknown', label: 'Trend unknown', arrow: '·', delta: null };
+    }
+    const last = samples[samples.length - 1];
+    // Prefer ~6h change; fall back to oldest sample in series
+    let ref = null;
+    const target = last.t - 6 * 3600 * 1000;
+    for (let i = samples.length - 2; i >= 0; i--) {
+      if (samples[i].t <= target) {
+        ref = samples[i];
+        break;
+      }
+    }
+    if (!ref) ref = samples[0];
+    const delta = last.v - ref.v;
+    const hours = Math.max(0.5, (last.t - ref.t) / 3600000);
+    const perDay = (delta / hours) * 24;
+    if (delta >= 0.15) {
+      return {
+        key: 'rising',
+        label: 'Rising',
+        arrow: '↑',
+        delta: delta,
+        detail:
+          '+' +
+          Math.abs(delta).toFixed(2) +
+          ' ft in ~' +
+          Math.round(hours) +
+          'h',
+      };
+    }
+    if (delta <= -0.15) {
+      return {
+        key: 'falling',
+        label: 'Falling',
+        arrow: '↓',
+        delta: delta,
+        detail:
+          '−' +
+          Math.abs(delta).toFixed(2) +
+          ' ft in ~' +
+          Math.round(hours) +
+          'h',
+      };
+    }
+    return {
+      key: 'steady',
+      label: 'Steady',
+      arrow: '→',
+      delta: delta,
+      detail: 'Little change (~' + Math.round(hours) + 'h)',
+    };
+  }
+
+  /**
+   * Low / normal / high / flood using NWS flood stage when known,
+   * else percentile within recent observed range.
+   */
+  function riverLevelStatus(stage, floodFt, samples) {
+    if (stage == null || isNaN(stage)) {
+      return { key: 'unknown', label: 'Level unknown', color: '#8b9bb4' };
+    }
+    if (floodFt != null && !isNaN(floodFt)) {
+      const ratio = stage / floodFt;
+      if (stage >= floodFt) {
+        return {
+          key: 'flood',
+          label: 'At/above flood stage',
+          color: '#e85d4c',
+          detail: floodFt + ' ft flood stage',
+        };
+      }
+      if (ratio >= 0.85) {
+        return {
+          key: 'high',
+          label: 'High',
+          color: '#f0c14a',
+          detail: Math.round(ratio * 100) + '% of flood stage',
+        };
+      }
+      if (ratio <= 0.4) {
+        return {
+          key: 'low',
+          label: 'Low',
+          color: '#5b9fd4',
+          detail: Math.round(ratio * 100) + '% of flood stage',
+        };
+      }
+      return {
+        key: 'normal',
+        label: 'Near normal',
+        color: '#3dcc8c',
+        detail: Math.round(ratio * 100) + '% of flood stage',
+      };
+    }
+    // No flood stage: use last few days min/max
+    if (samples && samples.length >= 4) {
+      let min = samples[0].v;
+      let max = samples[0].v;
+      for (let i = 1; i < samples.length; i++) {
+        if (samples[i].v < min) min = samples[i].v;
+        if (samples[i].v > max) max = samples[i].v;
+      }
+      const span = max - min;
+      if (span < 0.2) {
+        return {
+          key: 'normal',
+          label: 'Near normal',
+          color: '#3dcc8c',
+          detail: 'Little range lately',
+        };
+      }
+      const p = (stage - min) / span;
+      if (p <= 0.25) {
+        return {
+          key: 'low',
+          label: 'Low (recent range)',
+          color: '#5b9fd4',
+          detail: 'Toward recent low',
+        };
+      }
+      if (p >= 0.75) {
+        return {
+          key: 'high',
+          label: 'High (recent range)',
+          color: '#f0c14a',
+          detail: 'Toward recent high',
+        };
+      }
+      return {
+        key: 'normal',
+        label: 'Mid-range',
+        color: '#3dcc8c',
+        detail: 'Within recent range',
+      };
+    }
+    return { key: 'unknown', label: 'Level unknown', color: '#8b9bb4' };
+  }
+
+  function riverStageColor(levelKey, stageFt) {
+    if (levelKey === 'flood') return '#e85d4c';
+    if (levelKey === 'high') return '#f0c14a';
+    if (levelKey === 'low') return '#5b9fd4';
+    if (levelKey === 'normal') return '#3dcc8c';
+    if (stageFt == null || isNaN(stageFt)) return '#5b9fd4';
+    if (stageFt >= 35) return '#e85d4c';
+    if (stageFt >= 20) return '#f0c14a';
+    return '#5b9fd4';
+  }
+
+  async function loadRivers() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'rivers') return;
+    const myId = ++riverFetchId;
+    const legend = $('map-legend');
+    const info = $('map-info');
+    if (legend) legend.textContent = 'Loading Mississippi river stages · USGS…';
+    if (info) {
+      info.classList.remove('hidden');
+      info.innerHTML = '<p class="muted">Loading river gauges…</p>';
+    }
+
+    try {
+      const siteIds = MS_RIVER_SITES.map(function (s) {
+        return s.id;
+      }).join(',');
+      // P3D history so we can detect rising/falling and recent high/low
+      const url =
+        'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=' +
+        siteIds +
+        '&parameterCd=00065,00060&siteStatus=active&period=P3D';
+
+      let json;
+      if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+        json = await global.PureSkyNet.fetch(url, { as: 'json' });
+      } else {
+        const res = await fetch(url, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error('USGS ' + res.status);
+        json = await res.json();
+      }
+      if (myId !== riverFetchId || currentLayer !== 'rivers') return;
+
+      const series = (json.value && json.value.timeSeries) || [];
+      const bySite = {};
+      for (let i = 0; i < series.length; i++) {
+        const ts = series[i];
+        const src = ts.sourceInfo || {};
+        const siteCode =
+          src.siteCode && src.siteCode[0] && src.siteCode[0].value
+            ? src.siteCode[0].value
+            : null;
+        if (!siteCode) continue;
+        const geo =
+          src.geoLocation && src.geoLocation.geogLocation
+            ? src.geoLocation.geogLocation
+            : {};
+        const lat = geo.latitude != null ? Number(geo.latitude) : null;
+        const lon = geo.longitude != null ? Number(geo.longitude) : null;
+        const varCode =
+          ts.variable &&
+          ts.variable.variableCode &&
+          ts.variable.variableCode[0]
+            ? ts.variable.variableCode[0].value
+            : '';
+        const vals =
+          ts.values && ts.values[0] && ts.values[0].value
+            ? ts.values[0].value
+            : [];
+        if (!bySite[siteCode]) {
+          bySite[siteCode] = {
+            id: siteCode,
+            name: src.siteName || siteCode,
+            lat: lat,
+            lon: lon,
+            stage: null,
+            flow: null,
+            when: null,
+            stageSamples: [],
+          };
+        }
+        if (varCode === '00065' && vals.length) {
+          const samples = [];
+          for (let v = 0; v < vals.length; v++) {
+            const num = parseFloat(vals[v].value);
+            if (isNaN(num)) continue;
+            samples.push({
+              t: new Date(vals[v].dateTime).getTime(),
+              v: num,
+            });
+          }
+          samples.sort(function (a, b) {
+            return a.t - b.t;
+          });
+          bySite[siteCode].stageSamples = samples;
+          if (samples.length) {
+            bySite[siteCode].stage = samples[samples.length - 1].v;
+            bySite[siteCode].when = vals[vals.length - 1].dateTime;
+          }
+        } else if (varCode === '00060' && vals.length) {
+          const last = vals[vals.length - 1];
+          bySite[siteCode].flow = parseFloat(last.value);
+          if (!bySite[siteCode].when) bySite[siteCode].when = last.dateTime;
+        }
+      }
+
+      const origin = lastLoc || { lat: 30.45, lon: -91.19 };
+      let gauges = Object.keys(bySite).map(function (k) {
+        return bySite[k];
+      });
+      gauges = gauges.filter(function (g) {
+        return g.lat != null && g.lon != null;
+      });
+      gauges.forEach(function (g) {
+        g.mi = haversineMi(origin.lat, origin.lon, g.lat, g.lon);
+        g.floodFt = MS_FLOOD[g.id] != null ? MS_FLOOD[g.id] : null;
+        g.trend = riverTrend(g.stageSamples);
+        g.level = riverLevelStatus(g.stage, g.floodFt, g.stageSamples);
+      });
+      gauges.sort(function (a, b) {
+        return a.mi - b.mi;
+      });
+
+      const near = gauges.filter(function (g) {
+        return g.mi <= 220;
+      });
+      const show = (near.length >= 3 ? near : gauges).slice(0, 14);
+
+      if (riverLayerGroup && m) m.removeLayer(riverLayerGroup);
+      riverLayerGroup = L.layerGroup();
+      const bounds = [];
+
+      for (let i = 0; i < show.length; i++) {
+        const g = show[i];
+        const color = riverStageColor(g.level.key, g.stage);
+        const stageStr =
+          g.stage != null ? Math.round(g.stage * 10) / 10 + ' ft' : '—';
+        const chip =
+          stageStr +
+          ' ' +
+          (g.trend.arrow || '') +
+          (g.level.key === 'flood'
+            ? ' FLOOD'
+            : g.level.key === 'high'
+              ? ' High'
+              : g.level.key === 'low'
+                ? ' Low'
+                : '');
+        const icon = L.divIcon({
+          className: 'river-marker-icon',
+          html:
+            '<div class="river-marker" style="border-color:' +
+            color +
+            '"><span class="river-stage">' +
+            escapeHtml(chip.trim()) +
+            '</span></div>',
+          iconSize: [92, 28],
+          iconAnchor: [46, 14],
+        });
+        const flowStr =
+          g.flow != null
+            ? Math.round(g.flow).toLocaleString() + ' cfs'
+            : '—';
+        const whenStr = g.when
+          ? new Date(g.when).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          : '—';
+        const usgs =
+          'https://waterdata.usgs.gov/monitoring-location/USGS-' +
+          encodeURIComponent(g.id) +
+          '/';
+        const floodLine =
+          g.floodFt != null
+            ? '<div class="storm-popup-meta">Flood stage: <strong>' +
+              escapeHtml(g.floodFt + ' ft') +
+              '</strong></div>'
+            : '';
+        const popup =
+          '<div class="storm-popup-title">🌊 ' +
+          escapeHtml(g.name) +
+          '</div>' +
+          '<div class="storm-popup-meta">Stage: <strong>' +
+          escapeHtml(stageStr) +
+          '</strong></div>' +
+          '<div class="storm-popup-meta">Trend: <strong>' +
+          escapeHtml(g.trend.arrow + ' ' + g.trend.label) +
+          '</strong>' +
+          (g.trend.detail
+            ? ' · ' + escapeHtml(g.trend.detail)
+            : '') +
+          '</div>' +
+          '<div class="storm-popup-meta">Level: <strong style="color:' +
+          escapeHtml(g.level.color) +
+          '">' +
+          escapeHtml(g.level.label) +
+          '</strong>' +
+          (g.level.detail
+            ? ' · ' + escapeHtml(g.level.detail)
+            : '') +
+          '</div>' +
+          floodLine +
+          '<div class="storm-popup-meta">Flow: <strong>' +
+          escapeHtml(flowStr) +
+          '</strong></div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(Math.round(g.mi) + ' mi from weather location') +
+          '</div>' +
+          '<div class="storm-popup-meta">Observed ' +
+          escapeHtml(whenStr) +
+          '</div>' +
+          '<div class="storm-popup-meta" style="margin-top:6px"><a href="' +
+          escapeHtml(usgs) +
+          '" target="_blank" rel="noopener">USGS gauge</a></div>';
+        const mk = L.marker([g.lat, g.lon], { icon: icon });
+        mk.bindPopup(popup, { maxWidth: 300 });
+        riverLayerGroup.addLayer(mk);
+        bounds.push([g.lat, g.lon]);
+      }
+      riverLayerGroup.addTo(m);
+
+      if (bounds.length) {
+        try {
+          const pts = bounds.slice();
+          if (origin.lat != null) pts.push([origin.lat, origin.lon]);
+          m.fitBounds(pts, { padding: [40, 40], maxZoom: 8, animate: true });
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      const nearest = show[0];
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Mississippi River stages</div>' +
+          (nearest
+            ? '<div class="map-info-value" style="font-size:1.05rem">' +
+              escapeHtml(
+                nearest.stage != null
+                  ? Math.round(nearest.stage * 10) / 10 +
+                      ' ft ' +
+                      (nearest.trend.arrow || '')
+                  : '—'
+              ) +
+              '</div>' +
+              '<p class="muted small"><strong style="color:' +
+              escapeHtml(nearest.level.color) +
+              '">' +
+              escapeHtml(nearest.level.label) +
+              '</strong> · ' +
+              escapeHtml(nearest.trend.label) +
+              (nearest.trend.detail
+                ? ' (' + escapeHtml(nearest.trend.detail) + ')'
+                : '') +
+              '</p>' +
+              '<p class="muted small">Nearest: ' +
+              escapeHtml(nearest.name) +
+              ' · ' +
+              escapeHtml(Math.round(nearest.mi) + ' mi') +
+              '</p>'
+            : '<p class="muted">No gauges returned</p>') +
+          '<p class="muted small">↑ rising · ↓ falling · Low/High vs flood stage or recent range · USGS live data</p>';
+      }
+      if (legend) {
+        legend.textContent =
+          'Blue=low · green=normal · yellow=high · red=flood · arrows = rising/falling';
+      }
+    } catch (err) {
+      console.warn('River stages failed', err);
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">River stages</div>' +
+          '<p class="muted">Could not load USGS gauges</p>' +
+          '<p class="muted small">' +
+          escapeHtml(String((err && err.message) || err || '')) +
+          '</p>';
+      }
+      if (legend) legend.textContent = 'River stages unavailable';
+    }
+  }
+
+  // ─── Lightning / thunderstorm activity near location ───────────────────
+
+  function clearLightning() {
+    lightningFetchId++;
+    if (lightningLayerGroup && map) {
+      map.removeLayer(lightningLayerGroup);
+      lightningLayerGroup = null;
+    }
+  }
+
+  async function loadLightning() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'lightning') return;
+    const myId = ++lightningFetchId;
+    const legend = $('map-legend');
+    const info = $('map-info');
+    if (legend) legend.textContent = 'Loading storms near you…';
+    if (info) {
+      info.classList.remove('hidden');
+      info.innerHTML = '<p class="muted">Checking thunderstorms near your location…</p>';
+    }
+
+    const origin = lastLoc || { lat: 30.45, lon: -91.19, label: 'Location' };
+    const points = [];
+    let alertCount = 0;
+
+    try {
+      // 1) NWS thunderstorm warnings/watches (free, CORS-friendly)
+      const events = [
+        'Severe Thunderstorm Warning',
+        'Severe Thunderstorm Watch',
+        'Tornado Warning',
+        'Tornado Watch',
+        'Special Weather Statement',
+      ]
+        .map(encodeURIComponent)
+        .join(',');
+      const alertUrl =
+        'https://api.weather.gov/alerts/active?event=' +
+        events +
+        '&status=actual';
+      let geo;
+      if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
+        geo = await global.PureSkyNet.fetch(alertUrl, { as: 'json' });
+      } else {
+        const res = await fetch(alertUrl, {
+          headers: {
+            Accept: 'application/geo+json',
+            'User-Agent': 'GeauxWeather/1.0 (FOSS weather app)',
+          },
+        });
+        if (res.ok) geo = await res.json();
+      }
+      if (myId !== lightningFetchId || currentLayer !== 'lightning') return;
+
+      const features = (geo && geo.features) || [];
+      for (let i = 0; i < features.length; i++) {
+        const f = features[i];
+        const props = f.properties || {};
+        const eventName = props.event || 'Storm';
+        const el = eventName.toLowerCase();
+        // Focus on convective/lightning-relevant products
+        if (
+          el.indexOf('thunder') < 0 &&
+          el.indexOf('tornado') < 0 &&
+          el.indexOf('severe') < 0
+        ) {
+          continue;
+        }
+        const geom = f.geometry;
+        if (!geom) continue;
+        let lat = null;
+        let lon = null;
+        if (geom.type === 'Point') {
+          lon = geom.coordinates[0];
+          lat = geom.coordinates[1];
+        } else if (geom.type === 'Polygon' && geom.coordinates[0]) {
+          const ring = geom.coordinates[0];
+          let sx = 0;
+          let sy = 0;
+          for (let r = 0; r < ring.length; r++) {
+            sx += ring[r][0];
+            sy += ring[r][1];
+          }
+          lon = sx / ring.length;
+          lat = sy / ring.length;
+        } else if (geom.type === 'MultiPolygon' && geom.coordinates[0]) {
+          const ring = geom.coordinates[0][0] || [];
+          let sx = 0;
+          let sy = 0;
+          for (let r = 0; r < ring.length; r++) {
+            sx += ring[r][0];
+            sy += ring[r][1];
+          }
+          if (ring.length) {
+            lon = sx / ring.length;
+            lat = sy / ring.length;
+          }
+        }
+        if (lat == null || lon == null) continue;
+        const mi = haversineMi(origin.lat, origin.lon, lat, lon);
+        if (mi > 250) continue;
+        alertCount++;
+        points.push({
+          lat: lat,
+          lon: lon,
+          mi: mi,
+          kind: 'alert',
+          title: eventName,
+          detail: props.headline || props.areaDesc || '',
+        });
+
+        // Draw polygon for nearby warnings
+        if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+          // handled below after group create
+          points[points.length - 1].geom = geom;
+          points[points.length - 1].style = tornadoStyle(eventName);
+        }
+      }
+
+      // 2) Local thunderstorm weather codes on a grid around the pin (Open-Meteo)
+      const gridPts = [];
+      const step = 0.45; // ~30 mi
+      for (let di = -2; di <= 2; di++) {
+        for (let dj = -2; dj <= 2; dj++) {
+          gridPts.push({
+            lat: origin.lat + di * step,
+            lon: origin.lon + dj * step,
+          });
+        }
+      }
+      const lats = gridPts.map(function (p) {
+        return p.lat;
+      });
+      const lons = gridPts.map(function (p) {
+        return p.lon;
+      });
+      const omUrl =
+        'https://api.open-meteo.com/v1/forecast?latitude=' +
+        lats.join(',') +
+        '&longitude=' +
+        lons.join(',') +
+        '&current=weather_code,precipitation,cloud_cover' +
+        '&timezone=auto';
+      const omRes = await fetch(omUrl);
+      if (omRes.ok) {
+        let om = await omRes.json();
+        if (!Array.isArray(om)) om = [om];
+        for (let i = 0; i < om.length; i++) {
+          const row = om[i];
+          const c = row.current || {};
+          const code = Number(c.weather_code);
+          // WMO: 95–99 thunderstorms
+          if (code >= 95 && code <= 99) {
+            const lat = row.latitude != null ? row.latitude : gridPts[i].lat;
+            const lon = row.longitude != null ? row.longitude : gridPts[i].lon;
+            points.push({
+              lat: lat,
+              lon: lon,
+              mi: haversineMi(origin.lat, origin.lon, lat, lon),
+              kind: 'cell',
+              title: 'Thunderstorm activity',
+              detail:
+                'Weather model indicates thunderstorms (code ' + code + ')',
+            });
+          }
+        }
+      }
+
+      if (myId !== lightningFetchId || currentLayer !== 'lightning') return;
+
+      if (lightningLayerGroup && m) m.removeLayer(lightningLayerGroup);
+      lightningLayerGroup = L.layerGroup();
+      const bounds = [[origin.lat, origin.lon]];
+
+      // Home pin marker
+      const homeMk = L.circleMarker([origin.lat, origin.lon], {
+        radius: 7,
+        color: '#5eead4',
+        weight: 2,
+        fillColor: '#5eead4',
+        fillOpacity: 0.35,
+      });
+      homeMk.bindPopup(
+        '<div class="storm-popup-title">Your weather location</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(origin.label || 'Pinned location') +
+          '</div>'
+      );
+      lightningLayerGroup.addLayer(homeMk);
+
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        if (p.geom && p.style) {
+          try {
+            if (p.geom.type === 'Polygon') {
+              const rings = geoJsonToLatLngs(p.geom.coordinates, 'Polygon');
+              const poly = L.polygon(rings, p.style);
+              poly.bindPopup(
+                '<div class="storm-popup-title">⚡ ' +
+                  escapeHtml(p.title) +
+                  '</div>' +
+                  '<div class="storm-popup-meta">' +
+                  escapeHtml(p.detail) +
+                  '</div>'
+              );
+              lightningLayerGroup.addLayer(poly);
+            } else if (p.geom.type === 'MultiPolygon') {
+              const polys = geoJsonToLatLngs(p.geom.coordinates, 'MultiPolygon');
+              for (let j = 0; j < polys.length; j++) {
+                const poly = L.polygon(polys[j], p.style);
+                poly.bindPopup(
+                  '<div class="storm-popup-title">⚡ ' +
+                    escapeHtml(p.title) +
+                    '</div>'
+                );
+                lightningLayerGroup.addLayer(poly);
+              }
+            }
+          } catch (e) {
+            /* ignore bad geom */
+          }
+        }
+        const isCell = p.kind === 'cell';
+        const icon = L.divIcon({
+          className: 'storm-marker-icon',
+          html:
+            '<div class="storm-marker ' +
+            (isCell ? 'cat-ts' : 'cat-hu') +
+            '" title="lightning">⚡</div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
+        const mk = L.marker([p.lat, p.lon], { icon: icon, zIndexOffset: 400 });
+        mk.bindPopup(
+          '<div class="storm-popup-title">⚡ ' +
+            escapeHtml(p.title) +
+            '</div>' +
+            '<div class="storm-popup-meta">' +
+            escapeHtml(p.detail || '') +
+            '</div>' +
+            '<div class="storm-popup-meta">' +
+            escapeHtml(Math.round(p.mi) + ' mi from your location') +
+            '</div>'
+        );
+        lightningLayerGroup.addLayer(mk);
+        bounds.push([p.lat, p.lon]);
+      }
+      lightningLayerGroup.addTo(m);
+
+      try {
+        m.fitBounds(bounds, { padding: [48, 48], maxZoom: 8, animate: true });
+      } catch (e) {
+        /* ignore */
+      }
+
+      const nearStrikes = points.filter(function (p) {
+        return p.mi <= 50;
+      }).length;
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Lightning &amp; storms nearby</div>' +
+          '<div class="map-info-value" style="font-size:1.05rem">' +
+          (points.length
+            ? points.length + ' storm feature' + (points.length === 1 ? '' : 's')
+            : 'Quiet nearby') +
+          '</div>' +
+          '<p class="muted small">' +
+          escapeHtml(
+            nearStrikes
+              ? nearStrikes + ' within ~50 mi of ' + (origin.label || 'you')
+              : 'No active storm alerts / cells within range of ' +
+                  (origin.label || 'your location')
+          ) +
+          '</p>' +
+          '<p class="muted small">Shows NWS thunderstorm/tornado products + model thunderstorm cells near your weather pin. Not a paid strike network.</p>';
+      }
+      if (legend) {
+        legend.textContent =
+          '⚡ = storm alert/cell · polygons = NWS warnings · near ' +
+          (origin.label || 'pin');
+      }
+    } catch (err) {
+      console.warn('Lightning layer failed', err);
+      if (info) {
+        info.innerHTML =
+          '<div class="map-info-title">Lightning</div>' +
+          '<p class="muted">Could not load storm data</p>';
+      }
+      if (legend) legend.textContent = 'Lightning data unavailable';
+    }
+  }
+
   function setLayer(layer) {
     currentLayer = layer || 'radar';
     ensureMap();
@@ -1744,6 +2523,8 @@
     if (currentLayer !== 'hurricane') clearHurricane();
     if (currentLayer !== 'tornado') clearTornado();
     if (currentLayer !== 'eclipse') clearEclipse();
+    if (currentLayer !== 'rivers') clearRivers();
+    if (currentLayer !== 'lightning') clearLightning();
 
     if (currentLayer === 'radar') {
       hideDataOverlay();
@@ -1757,6 +2538,10 @@
           radarFront.addTo(map);
         }
       }
+      const legend = $('map-legend');
+      if (legend) {
+        legend.textContent = 'Rain & snow radar · RainViewer';
+      }
     } else if (currentLayer === 'wind') {
       setControlsVisible(false);
       wireWindMove();
@@ -1769,13 +2554,18 @@
       loadTornadoes();
     } else if (currentLayer === 'eclipse') {
       setControlsVisible(false);
-      // Drop leftover wind/fog info immediately
       const info = $('map-info');
       if (info) {
         info.classList.remove('hidden');
         info.innerHTML = '<p class="muted">Loading solar eclipse tracker…</p>';
       }
       loadEclipses();
+    } else if (currentLayer === 'rivers') {
+      setControlsVisible(false);
+      loadRivers();
+    } else if (currentLayer === 'lightning') {
+      setControlsVisible(false);
+      loadLightning();
     } else {
       // fog
       setControlsVisible(false);

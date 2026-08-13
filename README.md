@@ -30,7 +30,7 @@ Package ID: `com.geauxweather.app` · License: **GPL-3.0-or-later** · Reproduci
 
 - **Today** — conditions, sunrise/sunset, hourly; weather sky backgrounds (day/night)
 - **10-Day** — highs/lows and precip chance
-- **Maps** — rain radar (RainViewer), wind field, fog, hurricane cone/track (NHC), tornado/severe (NWS), solar eclipse paths
+- **Maps** — rain & snow radar (RainViewer), wind, fog, Mississippi river stages (USGS), lightning/storms near you, hurricane (NHC), tornado/severe (NWS), solar eclipse paths
 - **Places** — save pins; GPS or default home location
 - **Severe storm alerts** — optional location-based tornado / severe T-storm / nearby tropical
 - **Widget + status bar** temperature

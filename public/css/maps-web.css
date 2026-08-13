@@ -226,3 +226,12 @@
   color: #e8eef8 !important;
   border-color: rgba(255,255,255,0.12) !important;
 }
+
+.river-marker-icon { background: transparent !important; border: none !important; }
+.river-marker {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 52px; height: 26px; padding: 0 6px; border-radius: 999px;
+  background: rgba(12, 18, 28, 0.88); border: 2px solid #5b9fd4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.river-stage { font-size: 0.7rem; font-weight: 700; color: #e8eef8; white-space: nowrap; }

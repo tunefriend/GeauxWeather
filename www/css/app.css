@@ -1364,31 +1364,59 @@ button.setting-btn:active {
   border-color: #c44dff;
   background: rgba(50, 10, 60, 0.85);
 }
+/* Map popups: force high contrast (Leaflet default white + muted text is unreadable) */
 .leaflet-popup-content-wrapper {
-  background: var(--surface);
-  color: var(--text);
+  background: #141c2e !important;
+  color: #f0f4fa !important;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 .leaflet-popup-tip {
-  background: var(--surface);
+  background: #141c2e !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .leaflet-popup-content {
-  margin: 10px 12px;
-  font-size: 0.85rem;
-  line-height: 1.35;
+  margin: 12px 14px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #f0f4fa !important;
+  min-width: 12rem;
+  max-width: 16rem;
+}
+.leaflet-popup-close-button {
+  color: #e8eef8 !important;
+  font-size: 1.25rem !important;
+  padding: 6px 8px 0 0 !important;
+  opacity: 0.9;
+}
+.leaflet-popup-close-button:hover {
+  color: #fff !important;
+  opacity: 1;
 }
 .storm-popup-title {
   font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 4px;
+  font-size: 1rem;
+  margin-bottom: 8px;
+  color: #ffffff !important;
+  line-height: 1.3;
 }
 .storm-popup-meta {
-  color: var(--text-muted);
-  font-size: 0.78rem;
+  color: #c5d0e0 !important;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  margin-top: 3px;
 }
-.storm-popup a {
-  color: var(--accent);
+.storm-popup-meta strong {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+.storm-popup a,
+.leaflet-popup-content a {
+  color: #5eead4 !important;
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 .map-container {
@@ -1558,6 +1586,32 @@ button.setting-btn:active {
   height: 28px;
   opacity: 1;
   padding-top: 4px;
+}
+
+/* River stage markers */
+.river-marker-icon { background: transparent !important; border: none !important; }
+.river-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  max-width: 110px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(12, 18, 28, 0.92);
+  border: 2px solid #5b9fd4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.river-stage {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f0f4fa;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Eclipse tracker */

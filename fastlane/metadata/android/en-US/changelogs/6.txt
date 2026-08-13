@@ -1,0 +1,4 @@
+• Maps: Mississippi River stages with rising/falling and low/high/flood
+• Maps: Rain & snow radar; Lightning near your weather location
+• Map popups easier to read on phones
+• Wind legend uses km/h when metric units selected

@@ -656,6 +656,7 @@
           <span class="badge green">No ads</span>
           <span class="badge green">No tracking</span>
           <span class="badge green">On F-Droid · reproducible</span>
+          <span class="badge green">Chrome Web Store</span>
           <span class="badge">GPL-3.0-or-later</span>
         </div>
         <h1>Weather that gets out of your way.</h1>
@@ -669,7 +670,7 @@
           <a class="btn btn-secondary" href="#maps">Maps &amp; radar</a>
           <a class="btn btn-secondary" href="#install-app">Install as app</a>
           <a class="btn btn-secondary" href="#linux">Linux tray</a>
-          <a class="btn btn-secondary" href="#extension">Brave extension</a>
+          <a class="btn btn-secondary" href="https://chromewebstore.google.com/detail/geauxweather/pljnndfemdmnnmkdhhlmbmablmpdfjmd" rel="noopener">Chrome extension</a>
         </div>
       </div>
 
@@ -715,9 +716,11 @@
         </p>
         <div class="maps-wrap">
           <div class="map-toolbar">
-            <button type="button" class="layer-btn active" data-layer="radar">Rain</button>
+            <button type="button" class="layer-btn active" data-layer="radar">Rain/Snow</button>
             <button type="button" class="layer-btn" data-layer="wind">Wind</button>
             <button type="button" class="layer-btn" data-layer="fog">Fog</button>
+            <button type="button" class="layer-btn" data-layer="rivers">Rivers</button>
+            <button type="button" class="layer-btn" data-layer="lightning">Lightning</button>
             <button type="button" class="layer-btn" data-layer="hurricane">Hurricane</button>
             <button type="button" class="layer-btn" data-layer="tornado">Tornado</button>
             <button type="button" class="layer-btn" data-layer="eclipse">Eclipse</button>
@@ -821,25 +824,24 @@
     </section>
 
     <section id="extension">
-      <h2>Brave / Chrome extension</h2>
+      <h2>Chrome / Brave extension</h2>
       <div class="card">
         <p>
+          <strong>Now on the Chrome Web Store</strong> — install GeauxWeather for
+          <strong>Chrome</strong>, <strong>Brave</strong>, Edge, and other Chromium browsers.
           Toolbar popup with live weather, city search, temperature badge, and a link to this site.
-          Works in <strong>Brave</strong> and other Chromium browsers. No ads, no tracking.
+          No ads, no tracking.
         </p>
-        <p class="muted-line" style="margin-top:10px"><strong>Install (unpacked):</strong></p>
-        <ol class="install-steps">
-          <li>Download and unzip the extension</li>
-          <li>Open <code>brave://extensions</code></li>
-          <li>Turn on <strong>Developer mode</strong></li>
-          <li>Click <strong>Load unpacked</strong> and select the <code>geauxweather-brave</code> folder</li>
-          <li>Pin GeauxWeather from the puzzle-piece menu</li>
-        </ol>
         <div class="links" style="margin-top:14px">
-          <a class="btn btn-primary" href="/extension/geauxweather-chrome-store.zip">Chrome Web Store ZIP</a>
-          <a class="btn btn-secondary" href="/extension/geauxweather-brave.zip">Manual install ZIP</a>
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/geauxweather/pljnndfemdmnnmkdhhlmbmablmpdfjmd" rel="noopener">Get it on Chrome Web Store</a>
+          <a class="btn btn-secondary" href="/extension/geauxweather-brave.zip">Manual ZIP (Brave / developer)</a>
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/tree/main/extension/brave">Source on GitHub</a>
         </div>
+        <p class="muted-line" style="margin-top:12px">
+          Prefer sideloading? Unzip the manual package →
+          <code>brave://extensions</code> or <code>chrome://extensions</code> →
+          Developer mode → Load unpacked.
+        </p>
       </div>
     </section>
 
@@ -878,6 +880,7 @@
       <h2>Links</h2>
       <div class="links">
         <a class="btn btn-secondary" href="https://f-droid.org/packages/com.geauxweather.app/" rel="noopener">F-Droid</a>
+        <a class="btn btn-secondary" href="https://chromewebstore.google.com/detail/geauxweather/pljnndfemdmnnmkdhhlmbmablmpdfjmd" rel="noopener">Chrome extension</a>
         <a class="btn btn-secondary" href="/linux/geauxweather-linux-tray.tar.gz">Linux tray (.tar.gz)</a>
         <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather">GitHub</a>
         <a class="btn btn-secondary" href="https://gitlab.com/tunefriend/geauxweather">GitLab</a>
