@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="GeauxWeather — free, ad-free weather for Android. 10-day forecast, rain radar, wind, fog, hurricanes, tornado alerts. No tracking." />
-  <meta name="gw-build" content="1786399887" />
+  <meta name="gw-build" content="1786435100" />
   <meta name="theme-color" content="#0b1220" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -21,13 +21,13 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/lib/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="/css/maps-web.css" />
+  <link rel="stylesheet" href="/css/maps-web.css?v=1786435000" />
   <title>GeauxWeather — free weather, no ads</title>
-  <script src="/js/pwa.js" defer></script>
-  <script src="/js/maps-bridge.js" defer></script>
+  <script src="/js/pwa.js?v=1786435000" defer></script>
+  <script src="/js/maps-bridge.js?v=1786435000" defer></script>
   <script src="/lib/leaflet/leaflet.js" defer></script>
   <script src="/js/kmz.js" defer></script>
-  <script src="/js/maps.js" defer></script>
+  <script src="/js/maps.js?v=1786435000" defer></script>
   <style>
     :root {
       --text: #e8eef8;
@@ -325,9 +325,35 @@
     }
     .wx-updated { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
     .wx-main { text-align: center; padding: 8px 0 4px; }
+    /* Digits true-centered; ° sits in right gutter (same fix as Android app) */
     .wx-temp {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: start;
+      width: 100%;
+      box-sizing: border-box;
       font-size: 4.2rem; font-weight: 300; letter-spacing: -0.03em; line-height: 1;
       text-shadow: 0 4px 28px rgba(0,0,0,0.35);
+    }
+    .wx-temp-gutter { grid-column: 1; }
+    .wx-temp-num {
+      grid-column: 2;
+      justify-self: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+    }
+    .wx-temp-deg {
+      grid-column: 3;
+      justify-self: start;
+      align-self: start;
+      font-size: 0.42em;
+      font-weight: 300;
+      line-height: 1;
+      letter-spacing: 0;
+      margin-top: 0.12em;
+      margin-left: 0.04em;
+      pointer-events: none;
+      user-select: none;
     }
     .wx-cond { font-size: 1.15rem; margin-top: 6px; }
     .wx-feels { color: var(--muted); font-size: 0.95rem; margin-top: 4px; }
@@ -683,7 +709,11 @@
           </div>
         </div>
         <div class="wx-main">
-          <div class="wx-temp" id="wx-temp">—°</div>
+          <div class="wx-temp" id="wx-temp" aria-live="polite">
+            <span class="wx-temp-gutter" aria-hidden="true"></span>
+            <span id="wx-temp-num" class="wx-temp-num">—</span>
+            <span class="wx-temp-deg" aria-hidden="true">°</span>
+          </div>
           <div class="wx-cond" id="wx-cond">—</div>
           <div class="wx-feels" id="wx-feels">Feels —</div>
         </div>
@@ -708,10 +738,12 @@
       <h2>Maps &amp; radar</h2>
       <div class="card">
         <p style="margin:0 0 12px">
-          Layers: <strong>Rain</strong> (RainViewer),
+          Layers: <strong>Rain/Snow</strong> (radar + ⚡ storm cells near your pin),
           <strong>Wind</strong>, <strong>Fog</strong>,
+          <strong>Rivers</strong> (USGS stages · rising/falling),
+          <strong>Lightning</strong> (NWS warnings + model storm cells),
           <strong>Hurricane</strong> (NHC), <strong>Tornado / severe</strong> (NWS),
-          and <strong>Eclipse</strong> (path of totality for upcoming solar eclipses).
+          and <strong>Eclipse</strong> (path of totality).
           Click the map to drop a pin — it updates the weather panel above.
         </p>
         <div class="maps-wrap">
@@ -1147,8 +1179,16 @@
     var c = data.current || {};
     var code = c.weather_code;
     document.getElementById('wx-place').textContent = loc.label || '—';
-    document.getElementById('wx-temp').textContent =
-      c.temperature_2m != null ? Math.round(c.temperature_2m) + '°' : '—°';
+    var tNum = document.getElementById('wx-temp-num');
+    var tWrap = document.getElementById('wx-temp');
+    if (c.temperature_2m != null) {
+      var t = Math.round(c.temperature_2m);
+      if (tNum) tNum.textContent = String(t);
+      if (tWrap) tWrap.setAttribute('aria-label', t + ' degrees');
+    } else {
+      if (tNum) tNum.textContent = '—';
+      if (tWrap) tWrap.setAttribute('aria-label', 'Temperature unavailable');
+    }
     document.getElementById('wx-cond').textContent = codeLabel(code);
     document.getElementById('wx-feels').textContent =
       c.apparent_temperature != null ? 'Feels ' + Math.round(c.apparent_temperature) + '°F' : 'Feels —';

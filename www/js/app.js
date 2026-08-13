@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.5';
+  const APP_VERSION = '1.0.6';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -269,7 +269,12 @@
     const night = isNightFromDaily(data);
     setSkyMood(c.weather_code, night);
 
-    document.getElementById('temp-now').textContent = Math.round(c.temperature_2m) + '°';
+    const t = Math.round(c.temperature_2m);
+    const tempNum = document.getElementById('temp-num');
+    const tempNow = document.getElementById('temp-now');
+    if (tempNum) tempNum.textContent = String(t);
+    // Degree is a separate hang-off glyph so digits stay optically centered
+    if (tempNow) tempNow.setAttribute('aria-label', t + ' degrees');
     document.getElementById('cond-now').textContent = cond.icon + ' ' + cond.text;
     document.getElementById('feels').textContent =
       'Feels ' + Math.round(c.apparent_temperature) + deg;

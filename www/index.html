@@ -61,7 +61,12 @@
       <!-- Today -->
       <section id="screen-today" class="screen active">
         <div class="current">
-          <div id="temp-now" class="temp-now">—°</div>
+          <div id="temp-now" class="temp-now" aria-live="polite">
+            <!-- 1fr | digits | 1fr so digits are true screen-center; ° sits in the right gutter -->
+            <span class="temp-gutter" aria-hidden="true"></span>
+            <span id="temp-num" class="temp-num">—</span>
+            <span class="temp-deg" aria-hidden="true">°</span>
+          </div>
           <div id="cond-now" class="cond-now">—</div>
           <div id="feels" class="feels">Feels —°</div>
           <div class="sun-times" id="sun-times">
@@ -166,7 +171,7 @@
         </div>
         <p class="settings-hint muted small">Feedback opens email · Donate opens Liberapay · Website opens geauxweather.com</p>
         <div class="settings-group">
-          <p class="muted small" id="app-about">GeauxWeather · v1.0.5 · GPL-3.0 · Open-Meteo · No tracking</p>
+          <p class="muted small" id="app-about">GeauxWeather · v1.0.6 · GPL-3.0 · Open-Meteo · No tracking</p>
         </div>
       </section>
     </main>

@@ -72,6 +72,9 @@
   // Lightning / thunderstorm activity near location
   let lightningLayerGroup = null;
   let lightningFetchId = 0;
+  // ⚡ bolts drawn on Rain/Snow radar (same detection as Lightning tab)
+  let stormOverlayGroup = null;
+  let stormOverlayFetchId = 0;
 
   // RainViewer free tiles support zoom 0–7 only (higher shows "Zoom Level Not Supported")
   const RADAR_MAX_ZOOM = 7;
@@ -169,6 +172,12 @@
       color: loc.pinned ? '#e85d4c' : '#5b9fd4',
       fillColor: loc.pinned ? '#e85d4c' : '#5b9fd4',
     });
+    // Refresh storm bolts when the weather pin moves
+    if (currentLayer === 'radar') {
+      loadRadarStormOverlay();
+    } else if (currentLayer === 'lightning') {
+      loadLightning();
+    }
   }
 
   function dropPin(lat, lon, meta) {
@@ -290,7 +299,13 @@
 
     if (currentLayer === 'radar') {
       const legend = $('map-legend');
-      if (legend) {
+      // Don't clobber storm-cell legend while ⚡ overlay is active
+      if (
+        legend &&
+        (!stormOverlayGroup ||
+          !legend.textContent ||
+          legend.textContent.indexOf('⚡') < 0)
+      ) {
         legend.textContent = playing
           ? 'Playing rain & snow radar · RainViewer'
           : 'Rain & snow · RainViewer · tap map to pin';
@@ -1953,22 +1968,39 @@
       const siteIds = MS_RIVER_SITES.map(function (s) {
         return s.id;
       }).join(',');
-      // P3D history so we can detect rising/falling and recent high/low
-      const url =
+      // Prefer P3D history for rising/falling; fall back if USGS is flaky
+      const urls = [
         'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=' +
-        siteIds +
-        '&parameterCd=00065,00060&siteStatus=active&period=P3D';
+          siteIds +
+          '&parameterCd=00065,00060&siteStatus=active&period=P3D',
+        'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=' +
+          siteIds +
+          '&parameterCd=00065,00060&siteStatus=active',
+      ];
 
-      let json;
-      if (global.PureSkyNet && typeof global.PureSkyNet.fetch === 'function') {
-        json = await global.PureSkyNet.fetch(url, { as: 'json' });
-      } else {
+      async function fetchUsgsJson(url) {
         const res = await fetch(url, {
+          cache: 'no-cache',
           headers: { Accept: 'application/json' },
         });
         if (!res.ok) throw new Error('USGS ' + res.status);
-        json = await res.json();
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (ct.includes('html')) throw new Error('USGS returned HTML');
+        return res.json();
       }
+
+      let json = null;
+      let lastErr = null;
+      for (let u = 0; u < urls.length; u++) {
+        try {
+          json = await fetchUsgsJson(urls[u]);
+          if (json && json.value) break;
+        } catch (e) {
+          lastErr = e;
+          json = null;
+        }
+      }
+      if (!json) throw lastErr || new Error('USGS unavailable');
       if (myId !== riverFetchId || currentLayer !== 'rivers') return;
 
       const series = (json.value && json.value.timeSeries) || [];
@@ -2212,7 +2244,7 @@
     }
   }
 
-  // ─── Lightning / thunderstorm activity near location ───────────────────
+  // ─── Lightning / storm cells near pin (+ bolts on Rain/Snow) ───────────
 
   function clearLightning() {
     lightningFetchId++;
@@ -2222,30 +2254,151 @@
     }
   }
 
-  async function loadLightning() {
-    const m = ensureMap();
-    if (!m || currentLayer !== 'lightning') return;
-    const myId = ++lightningFetchId;
-    const legend = $('map-legend');
-    const info = $('map-info');
-    if (legend) legend.textContent = 'Loading storms near you…';
-    if (info) {
-      info.classList.remove('hidden');
-      info.innerHTML = '<p class="muted">Checking thunderstorms near your location…</p>';
+  function clearStormOverlay() {
+    stormOverlayFetchId++;
+    if (stormOverlayGroup && map) {
+      map.removeLayer(stormOverlayGroup);
+      stormOverlayGroup = null;
     }
+  }
 
-    const origin = lastLoc || { lat: 30.45, lon: -91.19, label: 'Location' };
+  function centroidOfGeom(geom) {
+    if (!geom) return null;
+    let lat = null;
+    let lon = null;
+    if (geom.type === 'Point') {
+      lon = geom.coordinates[0];
+      lat = geom.coordinates[1];
+    } else if (geom.type === 'Polygon' && geom.coordinates[0]) {
+      const ring = geom.coordinates[0];
+      let sx = 0;
+      let sy = 0;
+      for (let r = 0; r < ring.length; r++) {
+        sx += ring[r][0];
+        sy += ring[r][1];
+      }
+      lon = sx / ring.length;
+      lat = sy / ring.length;
+    } else if (geom.type === 'MultiPolygon' && geom.coordinates[0]) {
+      const ring = geom.coordinates[0][0] || [];
+      let sx = 0;
+      let sy = 0;
+      for (let r = 0; r < ring.length; r++) {
+        sx += ring[r][0];
+        sy += ring[r][1];
+      }
+      if (ring.length) {
+        lon = sx / ring.length;
+        lat = sy / ring.length;
+      }
+    }
+    if (lat == null || lon == null) return null;
+    return { lat: lat, lon: lon };
+  }
+
+  /**
+   * Classify Open-Meteo grid point as a storm/shower cell.
+   * Old code only used WMO 95–99 (true thunder) — most radar storms
+   * only show as showers (80–82) or heavy rain, so Lightning looked empty.
+   */
+  function classifyStormCell(code, precip, cape) {
+    code = Number(code);
+    precip = precip != null ? Number(precip) : 0;
+    cape = cape != null ? Number(cape) : 0;
+    if (isNaN(code)) code = 0;
+    if (isNaN(precip)) precip = 0;
+    if (isNaN(cape)) cape = 0;
+
+    // WMO thunderstorms (incl. hail)
+    if (code >= 95 && code <= 99) {
+      return {
+        kind: 'thunder',
+        title: 'Thunderstorm',
+        detail: 'Model thunderstorm (code ' + code + ')',
+        strength: 3,
+      };
+    }
+    // Rain / snow showers — often the only signal for active convection
+    if (code >= 80 && code <= 82) {
+      return {
+        kind: 'shower',
+        title: 'Heavy shower cell',
+        detail:
+          'Rain showers (code ' +
+          code +
+          ')' +
+          (precip > 0 ? ' · ' + precip.toFixed(1) + ' mm' : ''),
+        strength: 2,
+      };
+    }
+    if (code >= 85 && code <= 86) {
+      return {
+        kind: 'shower',
+        title: 'Snow shower cell',
+        detail: 'Snow showers (code ' + code + ')',
+        strength: 2,
+      };
+    }
+    // Heavy rain / freezing rain
+    if ((code >= 63 && code <= 67) || precip >= 1.5) {
+      return {
+        kind: 'heavy',
+        title: 'Heavy precip cell',
+        detail:
+          (precip > 0 ? precip.toFixed(1) + ' mm' : 'Heavy rain') +
+          (code ? ' · code ' + code : ''),
+        strength: 2,
+      };
+    }
+    // Moderate rain + high CAPE ≈ lightning-capable convection
+    if (precip >= 0.4 && cape >= 800) {
+      return {
+        kind: 'convective',
+        title: 'Unstable storm cell',
+        detail:
+          precip.toFixed(1) +
+          ' mm · CAPE ' +
+          Math.round(cape) +
+          ' J/kg (lightning possible)',
+        strength: 2,
+      };
+    }
+    // Light showers still useful when CAPE is high
+    if ((code === 61 || code === 51 || code === 53 || code === 55) && cape >= 1500) {
+      return {
+        kind: 'convective',
+        title: 'Developing convection',
+        detail: 'Light precip + high CAPE (' + Math.round(cape) + ')',
+        strength: 1,
+      };
+    }
+    return null;
+  }
+
+  function stormIconClass(kind) {
+    if (kind === 'alert' || kind === 'thunder') return 'cat-hu';
+    if (kind === 'shower' || kind === 'heavy' || kind === 'convective') {
+      return 'cat-ts';
+    }
+    return 'cat-ts';
+  }
+
+  /** Shared: NWS convective products + Open-Meteo storm cells near pin */
+  async function collectStormFeatures(origin) {
     const points = [];
     let alertCount = 0;
+    let cellCount = 0;
 
+    // 1) NWS thunderstorm / tornado / severe products
     try {
-      // 1) NWS thunderstorm warnings/watches (free, CORS-friendly)
       const events = [
         'Severe Thunderstorm Warning',
         'Severe Thunderstorm Watch',
         'Tornado Warning',
         'Tornado Watch',
         'Special Weather Statement',
+        'Flash Flood Warning',
+        'Severe Weather Statement',
       ]
         .map(encodeURIComponent)
         .join(',');
@@ -2265,78 +2418,52 @@
         });
         if (res.ok) geo = await res.json();
       }
-      if (myId !== lightningFetchId || currentLayer !== 'lightning') return;
-
       const features = (geo && geo.features) || [];
       for (let i = 0; i < features.length; i++) {
         const f = features[i];
         const props = f.properties || {};
         const eventName = props.event || 'Storm';
         const el = eventName.toLowerCase();
-        // Focus on convective/lightning-relevant products
         if (
           el.indexOf('thunder') < 0 &&
           el.indexOf('tornado') < 0 &&
-          el.indexOf('severe') < 0
+          el.indexOf('severe') < 0 &&
+          el.indexOf('flash flood') < 0
         ) {
           continue;
         }
         const geom = f.geometry;
-        if (!geom) continue;
-        let lat = null;
-        let lon = null;
-        if (geom.type === 'Point') {
-          lon = geom.coordinates[0];
-          lat = geom.coordinates[1];
-        } else if (geom.type === 'Polygon' && geom.coordinates[0]) {
-          const ring = geom.coordinates[0];
-          let sx = 0;
-          let sy = 0;
-          for (let r = 0; r < ring.length; r++) {
-            sx += ring[r][0];
-            sy += ring[r][1];
-          }
-          lon = sx / ring.length;
-          lat = sy / ring.length;
-        } else if (geom.type === 'MultiPolygon' && geom.coordinates[0]) {
-          const ring = geom.coordinates[0][0] || [];
-          let sx = 0;
-          let sy = 0;
-          for (let r = 0; r < ring.length; r++) {
-            sx += ring[r][0];
-            sy += ring[r][1];
-          }
-          if (ring.length) {
-            lon = sx / ring.length;
-            lat = sy / ring.length;
-          }
-        }
-        if (lat == null || lon == null) continue;
-        const mi = haversineMi(origin.lat, origin.lon, lat, lon);
-        if (mi > 250) continue;
+        const c = centroidOfGeom(geom);
+        if (!c) continue;
+        const mi = haversineMi(origin.lat, origin.lon, c.lat, c.lon);
+        if (mi > 280) continue;
         alertCount++;
-        points.push({
-          lat: lat,
-          lon: lon,
+        const pt = {
+          lat: c.lat,
+          lon: c.lon,
           mi: mi,
           kind: 'alert',
           title: eventName,
           detail: props.headline || props.areaDesc || '',
-        });
-
-        // Draw polygon for nearby warnings
-        if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-          // handled below after group create
-          points[points.length - 1].geom = geom;
-          points[points.length - 1].style = tornadoStyle(eventName);
+          strength: 3,
+        };
+        if (geom && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) {
+          pt.geom = geom;
+          pt.style = tornadoStyle(eventName);
         }
+        points.push(pt);
       }
+    } catch (e) {
+      console.warn('Storm alerts failed', e);
+    }
 
-      // 2) Local thunderstorm weather codes on a grid around the pin (Open-Meteo)
+    // 2) Dense Open-Meteo grid — showers + thunder + heavy precip + CAPE
+    try {
       const gridPts = [];
-      const step = 0.45; // ~30 mi
-      for (let di = -2; di <= 2; di++) {
-        for (let dj = -2; dj <= 2; dj++) {
+      const step = 0.28; // ~19 mi
+      // 7×7 = 49 pts ≈ 80 mi radius
+      for (let di = -3; di <= 3; di++) {
+        for (let dj = -3; dj <= 3; dj++) {
           gridPts.push({
             lat: origin.lat + di * step,
             lon: origin.lon + dj * step,
@@ -2354,40 +2481,190 @@
         lats.join(',') +
         '&longitude=' +
         lons.join(',') +
-        '&current=weather_code,precipitation,cloud_cover' +
+        '&current=weather_code,precipitation,rain,showers,cape,cloud_cover' +
         '&timezone=auto';
-      const omRes = await fetch(omUrl);
+      const omRes = await fetch(omUrl, { cache: 'no-cache' });
       if (omRes.ok) {
         let om = await omRes.json();
         if (!Array.isArray(om)) om = [om];
         for (let i = 0; i < om.length; i++) {
           const row = om[i];
           const c = row.current || {};
-          const code = Number(c.weather_code);
-          // WMO: 95–99 thunderstorms
-          if (code >= 95 && code <= 99) {
-            const lat = row.latitude != null ? row.latitude : gridPts[i].lat;
-            const lon = row.longitude != null ? row.longitude : gridPts[i].lon;
-            points.push({
-              lat: lat,
-              lon: lon,
-              mi: haversineMi(origin.lat, origin.lon, lat, lon),
-              kind: 'cell',
-              title: 'Thunderstorm activity',
-              detail:
-                'Weather model indicates thunderstorms (code ' + code + ')',
-            });
-          }
+          const hit = classifyStormCell(
+            c.weather_code,
+            c.precipitation != null ? c.precipitation : c.rain,
+            c.cape
+          );
+          if (!hit) continue;
+          const lat = row.latitude != null ? row.latitude : gridPts[i].lat;
+          const lon = row.longitude != null ? row.longitude : gridPts[i].lon;
+          cellCount++;
+          points.push({
+            lat: lat,
+            lon: lon,
+            mi: haversineMi(origin.lat, origin.lon, lat, lon),
+            kind: hit.kind,
+            title: hit.title,
+            detail: hit.detail,
+            strength: hit.strength,
+          });
         }
       }
+    } catch (e) {
+      console.warn('Storm cell grid failed', e);
+    }
 
+    // De-dupe points within ~8 mi (keep stronger / closer)
+    points.sort(function (a, b) {
+      return (b.strength || 0) - (a.strength || 0) || a.mi - b.mi;
+    });
+    const kept = [];
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      let tooClose = false;
+      for (let j = 0; j < kept.length; j++) {
+        if (haversineMi(p.lat, p.lon, kept[j].lat, kept[j].lon) < 8) {
+          // Prefer keeping alert polygons; merge title if needed
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) kept.push(p);
+    }
+
+    return {
+      points: kept,
+      alertCount: alertCount,
+      cellCount: cellCount,
+    };
+  }
+
+  function addStormMarkersToGroup(group, points, opts) {
+    opts = opts || {};
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (opts.drawPolygons && p.geom && p.style) {
+        try {
+          if (p.geom.type === 'Polygon') {
+            const rings = geoJsonToLatLngs(p.geom.coordinates, 'Polygon');
+            const poly = L.polygon(rings, p.style);
+            poly.bindPopup(
+              '<div class="storm-popup-title">⚡ ' +
+                escapeHtml(p.title) +
+                '</div>' +
+                '<div class="storm-popup-meta">' +
+                escapeHtml(p.detail || '') +
+                '</div>'
+            );
+            group.addLayer(poly);
+          } else if (p.geom.type === 'MultiPolygon') {
+            const polys = geoJsonToLatLngs(p.geom.coordinates, 'MultiPolygon');
+            for (let j = 0; j < polys.length; j++) {
+              const poly = L.polygon(polys[j], p.style);
+              poly.bindPopup(
+                '<div class="storm-popup-title">⚡ ' +
+                  escapeHtml(p.title) +
+                  '</div>'
+              );
+              group.addLayer(poly);
+            }
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      const icon = L.divIcon({
+        className: 'storm-marker-icon',
+        html:
+          '<div class="storm-marker ' +
+          stormIconClass(p.kind) +
+          '" title="' +
+          escapeHtml(p.title) +
+          '">⚡</div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      });
+      const mk = L.marker([p.lat, p.lon], {
+        icon: icon,
+        zIndexOffset: 500 + (p.strength || 0) * 10,
+      });
+      mk.bindPopup(
+        '<div class="storm-popup-title">⚡ ' +
+          escapeHtml(p.title) +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(p.detail || '') +
+          '</div>' +
+          '<div class="storm-popup-meta">' +
+          escapeHtml(Math.round(p.mi) + ' mi from your location') +
+          '</div>' +
+          '<div class="storm-popup-meta muted">Not a paid lightning-strike network — NWS alerts + weather model cells</div>'
+      );
+      group.addLayer(mk);
+    }
+  }
+
+  /** ⚡ bolts on Rain/Snow map near the weather pin */
+  async function loadRadarStormOverlay() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'radar') return;
+    const myId = ++stormOverlayFetchId;
+    const origin = lastLoc || { lat: 30.45, lon: -91.19, label: 'Location' };
+    const legend = $('map-legend');
+
+    try {
+      const result = await collectStormFeatures(origin);
+      if (myId !== stormOverlayFetchId || currentLayer !== 'radar') return;
+
+      if (stormOverlayGroup && m) m.removeLayer(stormOverlayGroup);
+      stormOverlayGroup = L.layerGroup();
+      addStormMarkersToGroup(stormOverlayGroup, result.points, {
+        drawPolygons: false,
+      });
+      stormOverlayGroup.addTo(m);
+
+      if (legend) {
+        const n = result.points.length;
+        legend.textContent = n
+          ? 'Rain & snow · ⚡ ' +
+            n +
+            ' storm cell' +
+            (n === 1 ? '' : 's') +
+            ' near pin · RainViewer'
+          : 'Rain & snow radar · RainViewer · ⚡ when storm cells near pin';
+      }
+    } catch (err) {
+      console.warn('Radar storm overlay failed', err);
+      if (legend && currentLayer === 'radar') {
+        legend.textContent = 'Rain & snow radar · RainViewer';
+      }
+    }
+  }
+
+  async function loadLightning() {
+    const m = ensureMap();
+    if (!m || currentLayer !== 'lightning') return;
+    const myId = ++lightningFetchId;
+    const legend = $('map-legend');
+    const info = $('map-info');
+    if (legend) legend.textContent = 'Loading storms near you…';
+    if (info) {
+      info.classList.remove('hidden');
+      info.innerHTML =
+        '<p class="muted">Checking thunderstorms &amp; storm cells near your pin…</p>';
+    }
+
+    const origin = lastLoc || { lat: 30.45, lon: -91.19, label: 'Location' };
+
+    try {
+      const result = await collectStormFeatures(origin);
       if (myId !== lightningFetchId || currentLayer !== 'lightning') return;
 
+      const points = result.points;
       if (lightningLayerGroup && m) m.removeLayer(lightningLayerGroup);
       lightningLayerGroup = L.layerGroup();
       const bounds = [[origin.lat, origin.lon]];
 
-      // Home pin marker
       const homeMk = L.circleMarker([origin.lat, origin.lon], {
         radius: 7,
         color: '#5eead4',
@@ -2403,62 +2680,11 @@
       );
       lightningLayerGroup.addLayer(homeMk);
 
+      addStormMarkersToGroup(lightningLayerGroup, points, {
+        drawPolygons: true,
+      });
       for (let i = 0; i < points.length; i++) {
-        const p = points[i];
-        if (p.geom && p.style) {
-          try {
-            if (p.geom.type === 'Polygon') {
-              const rings = geoJsonToLatLngs(p.geom.coordinates, 'Polygon');
-              const poly = L.polygon(rings, p.style);
-              poly.bindPopup(
-                '<div class="storm-popup-title">⚡ ' +
-                  escapeHtml(p.title) +
-                  '</div>' +
-                  '<div class="storm-popup-meta">' +
-                  escapeHtml(p.detail) +
-                  '</div>'
-              );
-              lightningLayerGroup.addLayer(poly);
-            } else if (p.geom.type === 'MultiPolygon') {
-              const polys = geoJsonToLatLngs(p.geom.coordinates, 'MultiPolygon');
-              for (let j = 0; j < polys.length; j++) {
-                const poly = L.polygon(polys[j], p.style);
-                poly.bindPopup(
-                  '<div class="storm-popup-title">⚡ ' +
-                    escapeHtml(p.title) +
-                    '</div>'
-                );
-                lightningLayerGroup.addLayer(poly);
-              }
-            }
-          } catch (e) {
-            /* ignore bad geom */
-          }
-        }
-        const isCell = p.kind === 'cell';
-        const icon = L.divIcon({
-          className: 'storm-marker-icon',
-          html:
-            '<div class="storm-marker ' +
-            (isCell ? 'cat-ts' : 'cat-hu') +
-            '" title="lightning">⚡</div>',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        });
-        const mk = L.marker([p.lat, p.lon], { icon: icon, zIndexOffset: 400 });
-        mk.bindPopup(
-          '<div class="storm-popup-title">⚡ ' +
-            escapeHtml(p.title) +
-            '</div>' +
-            '<div class="storm-popup-meta">' +
-            escapeHtml(p.detail || '') +
-            '</div>' +
-            '<div class="storm-popup-meta">' +
-            escapeHtml(Math.round(p.mi) + ' mi from your location') +
-            '</div>'
-        );
-        lightningLayerGroup.addLayer(mk);
-        bounds.push([p.lat, p.lon]);
+        bounds.push([points[i].lat, points[i].lon]);
       }
       lightningLayerGroup.addTo(m);
 
@@ -2468,31 +2694,45 @@
         /* ignore */
       }
 
-      const nearStrikes = points.filter(function (p) {
+      const near = points.filter(function (p) {
         return p.mi <= 50;
       }).length;
+      const nAlerts = points.filter(function (p) {
+        return p.kind === 'alert';
+      }).length;
+      const nCells = points.length - nAlerts;
+
       if (info) {
         info.innerHTML =
           '<div class="map-info-title">Lightning &amp; storms nearby</div>' +
           '<div class="map-info-value" style="font-size:1.05rem">' +
           (points.length
-            ? points.length + ' storm feature' + (points.length === 1 ? '' : 's')
+            ? points.length +
+              ' feature' +
+              (points.length === 1 ? '' : 's') +
+              (nAlerts ? ' · ' + nAlerts + ' NWS' : '') +
+              (nCells ? ' · ' + nCells + ' cell' + (nCells === 1 ? '' : 's') : '')
             : 'Quiet nearby') +
           '</div>' +
           '<p class="muted small">' +
           escapeHtml(
-            nearStrikes
-              ? nearStrikes + ' within ~50 mi of ' + (origin.label || 'you')
-              : 'No active storm alerts / cells within range of ' +
-                  (origin.label || 'your location')
+            points.length
+              ? near
+                ? near + ' within ~50 mi of ' + (origin.label || 'you')
+                : 'Nearest storm activity is beyond 50 mi of ' +
+                  (origin.label || 'your pin')
+              : 'No NWS storm warnings and no model storm cells near ' +
+                  (origin.label || 'your pin') +
+                  '. Radar can still show rain without a thunder warning.'
           ) +
           '</p>' +
-          '<p class="muted small">Shows NWS thunderstorm/tornado products + model thunderstorm cells near your weather pin. Not a paid strike network.</p>';
+          '<p class="muted small">⚡ bolts = NWS warnings + Open-Meteo storm/shower cells (not a paid lightning strike network). Also drawn on Rain/Snow.</p>';
       }
       if (legend) {
-        legend.textContent =
-          '⚡ = storm alert/cell · polygons = NWS warnings · near ' +
-          (origin.label || 'pin');
+        legend.textContent = points.length
+          ? '⚡ = storm cell · red = warning/thunder · yellow = shower/heavy precip · near ' +
+            (origin.label || 'pin')
+          : 'No storm cells near ' + (origin.label || 'pin') + ' right now';
       }
     } catch (err) {
       console.warn('Lightning layer failed', err);
@@ -2518,7 +2758,10 @@
     });
 
     // Tear down non-active overlays
-    if (currentLayer !== 'radar') clearRadar();
+    if (currentLayer !== 'radar') {
+      clearRadar();
+      clearStormOverlay();
+    }
     if (currentLayer !== 'wind') clearWind();
     if (currentLayer !== 'hurricane') clearHurricane();
     if (currentLayer !== 'tornado') clearTornado();
@@ -2540,8 +2783,10 @@
       }
       const legend = $('map-legend');
       if (legend) {
-        legend.textContent = 'Rain & snow radar · RainViewer';
+        legend.textContent = 'Rain & snow radar · loading ⚡ cells…';
       }
+      // ⚡ storm cells on top of radar (same sources as Lightning tab)
+      loadRadarStormOverlay();
     } else if (currentLayer === 'wind') {
       setControlsVisible(false);
       wireWindMove();
