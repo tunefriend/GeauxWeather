@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.7';
+  const APP_VERSION = '1.0.8';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -82,6 +82,146 @@
     });
   });
 
+  /** Home-screen widget look (native reads CapacitorStorage geauxweather_widget_style) */
+  function defaultWidgetStyle() {
+    return { bgOpacity: 0, bgColor: '#141a22', textColor: '#ffffff' };
+  }
+
+  function loadWidgetStyle() {
+    try {
+      const raw = localStorage.getItem('geauxweather_widget_style');
+      if (!raw) return defaultWidgetStyle();
+      const o = JSON.parse(raw);
+      return {
+        bgOpacity: Math.max(0, Math.min(100, Number(o.bgOpacity) || 0)),
+        bgColor: typeof o.bgColor === 'string' ? o.bgColor : '#141a22',
+        textColor: typeof o.textColor === 'string' ? o.textColor : '#ffffff',
+      };
+    } catch (e) {
+      return defaultWidgetStyle();
+    }
+  }
+
+  function opacityLabel(n) {
+    if (n <= 0) return 'Transparent';
+    if (n >= 100) return 'Solid';
+    return n + '%';
+  }
+
+  function syncWidgetStyleControls(style) {
+    const op = document.getElementById('widget-opacity');
+    const opLab = document.getElementById('widget-opacity-label');
+    const bg = document.getElementById('widget-bg-color');
+    const text = document.getElementById('widget-text-color');
+    if (op) op.value = String(style.bgOpacity);
+    if (opLab) opLab.textContent = opacityLabel(style.bgOpacity);
+    if (bg) bg.value = normalizeHexColor(style.bgColor, '#141a22');
+    if (text) text.value = normalizeHexColor(style.textColor, '#ffffff');
+  }
+
+  function normalizeHexColor(hex, fallback) {
+    if (!hex || typeof hex !== 'string') return fallback;
+    let h = hex.trim();
+    if (h.charAt(0) !== '#') h = '#' + h;
+    if (/^#[0-9a-fA-F]{3}$/.test(h)) {
+      h =
+        '#' +
+        h.charAt(1) +
+        h.charAt(1) +
+        h.charAt(2) +
+        h.charAt(2) +
+        h.charAt(3) +
+        h.charAt(3);
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(h)) return fallback;
+    return h.toLowerCase();
+  }
+
+  async function saveWidgetStyle(style, opts) {
+    opts = opts || {};
+    const payload = JSON.stringify({
+      bgOpacity: style.bgOpacity,
+      bgColor: normalizeHexColor(style.bgColor, '#141a22'),
+      textColor: normalizeHexColor(style.textColor, '#ffffff'),
+    });
+    localStorage.setItem('geauxweather_widget_style', payload);
+    try {
+      if (
+        window.Capacitor &&
+        window.Capacitor.isNativePlatform &&
+        window.Capacitor.isNativePlatform() &&
+        window.Capacitor.Plugins &&
+        window.Capacitor.Plugins.Preferences
+      ) {
+        await window.Capacitor.Plugins.Preferences.set({
+          key: 'geauxweather_widget_style',
+          value: payload,
+        });
+      }
+    } catch (e) {
+      console.warn('widget style prefs write skipped', e);
+    }
+    if (opts.refresh !== false) {
+      try {
+        if (
+          window.Capacitor &&
+          window.Capacitor.Plugins &&
+          window.Capacitor.Plugins.GeauxWeatherNative &&
+          typeof window.Capacitor.Plugins.GeauxWeatherNative.refreshChrome ===
+            'function'
+        ) {
+          await window.Capacitor.Plugins.GeauxWeatherNative.refreshChrome();
+        }
+      } catch (e) {
+        console.warn('widget style refresh skipped', e);
+      }
+    }
+  }
+
+  function wireWidgetStyleSettings() {
+    const op = document.getElementById('widget-opacity');
+    const opLab = document.getElementById('widget-opacity-label');
+    const bg = document.getElementById('widget-bg-color');
+    const text = document.getElementById('widget-text-color');
+    let style = loadWidgetStyle();
+    syncWidgetStyleControls(style);
+
+    function readFromUi() {
+      return {
+        bgOpacity: op ? parseInt(op.value, 10) || 0 : 0,
+        bgColor: bg ? bg.value : '#141a22',
+        textColor: text ? text.value : '#ffffff',
+      };
+    }
+
+    let saveTimer = null;
+    function scheduleSave() {
+      style = readFromUi();
+      if (opLab) opLab.textContent = opacityLabel(style.bgOpacity);
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () {
+        saveWidgetStyle(style);
+      }, 120);
+    }
+
+    if (op) {
+      op.addEventListener('input', scheduleSave);
+      op.addEventListener('change', scheduleSave);
+    }
+    if (bg) bg.addEventListener('input', scheduleSave);
+    if (text) text.addEventListener('input', scheduleSave);
+
+    document.querySelectorAll('.widget-swatch[data-text]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const c = btn.getAttribute('data-text');
+        if (text && c) {
+          text.value = normalizeHexColor(c, '#ffffff');
+          scheduleSave();
+        }
+      });
+    });
+  }
+
   function loadPrefs() {
     if (unitsSelect) unitsSelect.value = units;
     const skyToggle = document.getElementById('sky-bg-toggle');
@@ -90,6 +230,7 @@
     if (hurToggle) {
       hurToggle.checked = localStorage.getItem('geauxweather_hurricane_alerts') === 'on';
     }
+    syncWidgetStyleControls(loadWidgetStyle());
     const about = document.getElementById('app-about');
     if (about) {
       about.textContent =
@@ -112,6 +253,7 @@
       setSkyMood(lastWeatherCode, lastIsNight);
     });
   }
+  wireWidgetStyleSettings();
 
   function setStatus(msg, ms) {
     statusEl.textContent = msg || '';
@@ -473,6 +615,8 @@
         updatedAt: Date.now(),
       });
       localStorage.setItem('geauxweather_widget', payload);
+      // Keep style in CapacitorStorage so native widget can apply opacity/colors
+      await saveWidgetStyle(loadWidgetStyle(), { refresh: false });
       try {
         if (
           window.Capacitor &&

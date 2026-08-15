@@ -155,6 +155,32 @@
         <p class="settings-hint muted small" id="hurricane-alerts-hint">
           Tornado, severe thunderstorm &amp; nearby hurricanes for your home or default location
         </p>
+        <h2 class="section-title" style="margin-top:4px">Home screen widget</h2>
+        <div class="settings-group">
+          <label class="setting-row setting-row-stack">
+            <span class="setting-label-row">
+              <span>Background opacity</span>
+              <span class="muted small" id="widget-opacity-label">Transparent</span>
+            </span>
+            <input type="range" id="widget-opacity" min="0" max="100" value="0" step="5" aria-valuemin="0" aria-valuemax="100" />
+          </label>
+          <label class="setting-row">
+            <span>Background color</span>
+            <input type="color" id="widget-bg-color" value="#141a22" />
+          </label>
+          <label class="setting-row">
+            <span>Text color</span>
+            <span class="widget-text-presets">
+              <button type="button" class="widget-swatch" data-text="#ffffff" title="White" style="background:#fff"></button>
+              <button type="button" class="widget-swatch" data-text="#e8eef8" title="Light" style="background:#e8eef8"></button>
+              <button type="button" class="widget-swatch" data-text="#1a1a1a" title="Black" style="background:#1a1a1a"></button>
+              <input type="color" id="widget-text-color" value="#ffffff" title="Custom text color" />
+            </span>
+          </label>
+        </div>
+        <p class="settings-hint muted small">
+          Opacity 0 = fully transparent (wallpaper shows through). Re-add the widget if it does not update right away.
+        </p>
         <div class="settings-group">
           <button type="button" id="btn-feedback" class="setting-row setting-btn">
             <span>Send feedback</span>
@@ -171,7 +197,7 @@
         </div>
         <p class="settings-hint muted small">Feedback opens email · Donate opens Liberapay · Website opens geauxweather.com</p>
         <div class="settings-group">
-          <p class="muted small" id="app-about">GeauxWeather · v1.0.7 · GPL-3.0 · Open-Meteo · No tracking</p>
+          <p class="muted small" id="app-about">GeauxWeather · v1.0.8 · GPL-3.0 · Open-Meteo · No tracking</p>
         </div>
       </section>
     </main>

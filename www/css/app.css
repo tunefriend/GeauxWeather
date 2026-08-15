@@ -843,6 +843,54 @@ body.sky-mood-default {
   cursor: pointer;
 }
 
+.setting-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.setting-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+.setting-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 1.25rem;
+  cursor: pointer;
+}
+.setting-row input[type="color"] {
+  width: 2.5rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.widget-text-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.widget-swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  background-clip: padding-box;
+}
+.widget-swatch:hover,
+.widget-swatch:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
 button.setting-btn {
   width: 100%;
   background: none;

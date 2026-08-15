@@ -1,0 +1,3 @@
+• Settings: home-screen widget background opacity (transparent → solid)
+• Settings: widget background color and text color
+• Soft shadows keep text readable; changes apply when you open the app or refresh weather
