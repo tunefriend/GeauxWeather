@@ -16,8 +16,12 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text="GeauxWeather"
-        android:textColor="#B0BEC5"
-        android:textSize="11sp" />
+        android:textColor="#F0F4FA"
+        android:textSize="11sp"
+        android:shadowColor="#CC000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -34,7 +38,11 @@
             android:textColor="#FFFFFF"
             android:textSize="32sp"
             android:textStyle="bold"
-            android:includeFontPadding="false" />
+            android:includeFontPadding="false"
+            android:shadowColor="#CC000000"
+            android:shadowDx="0"
+            android:shadowDy="1.5"
+            android:shadowRadius="4" />
 
         <TextView
             android:id="@+id/widget_condition"
@@ -45,8 +53,12 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:text="Open app to load"
-            android:textColor="#E8EEF6"
-            android:textSize="13sp" />
+            android:textColor="#F0F4FA"
+            android:textSize="13sp"
+            android:shadowColor="#CC000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="3" />
     </LinearLayout>
 
     <TextView
@@ -55,6 +67,10 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:text="H —°  L —°"
-        android:textColor="#8B9BB4"
-        android:textSize="11sp" />
+        android:textColor="#E8EEF6"
+        android:textSize="11sp"
+        android:shadowColor="#CC000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3" />
 </LinearLayout>

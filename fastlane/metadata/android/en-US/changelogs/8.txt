@@ -1,0 +1,2 @@
+• Home-screen widget: transparent background so your wallpaper shows through
+• Soft text shadow so temp stays readable on light and dark wallpapers

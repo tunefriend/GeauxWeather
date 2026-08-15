@@ -1,6 +1,6 @@
 {
   "name": "geauxweather",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "GeauxWeather \u2014 clean, fast, no-ads weather for Android",
   "main": "index.js",
   "scripts": {
