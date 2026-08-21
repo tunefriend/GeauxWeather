@@ -358,7 +358,10 @@
     .wx-cond { font-size: 1.15rem; margin-top: 6px; }
     .wx-feels { color: var(--muted); font-size: 0.95rem; margin-top: 4px; }
     .wx-metrics {
-      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    @media (min-width: 420px) {
+      .wx-metrics { grid-template-columns: 1fr 1fr 1fr 1fr; }
     }
     .wx-metric {
       background: rgba(10, 16, 26, 0.45);
@@ -720,6 +723,7 @@
         <div class="wx-metrics">
           <div class="wx-metric"><span class="lbl">Wind</span><span class="val" id="wx-wind">—</span></div>
           <div class="wx-metric"><span class="lbl">Humidity</span><span class="val" id="wx-hum">—</span></div>
+          <div class="wx-metric"><span class="lbl">Dew point</span><span class="val" id="wx-dew">—</span></div>
           <div class="wx-metric"><span class="lbl">UV</span><span class="val" id="wx-uv">—</span></div>
         </div>
         <div class="wx-actions">
@@ -1205,6 +1209,11 @@
         : '—';
     document.getElementById('wx-hum').textContent =
       c.relative_humidity_2m != null ? c.relative_humidity_2m + '%' : '—';
+    var dewEl = document.getElementById('wx-dew');
+    if (dewEl) {
+      dewEl.textContent =
+        c.dew_point_2m != null ? Math.round(c.dew_point_2m) + '°F' : '—';
+    }
     document.getElementById('wx-uv').textContent =
       c.uv_index != null ? String(Math.round(c.uv_index)) : '—';
     var t = new Date();
@@ -1221,7 +1230,7 @@
     var params = new URLSearchParams({
       latitude: String(lat),
       longitude: String(lon),
-      current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,uv_index,is_day,visibility',
+      current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,uv_index,is_day,visibility',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max',
       temperature_unit: 'fahrenheit',
       wind_speed_unit: 'mph',

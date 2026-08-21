@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.9';
+  const APP_VERSION = '1.0.10';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -440,6 +440,11 @@
           W.windDir(c.wind_direction_10m),
       },
       { label: 'Humidity', value: c.relative_humidity_2m + '%' },
+      {
+        label: 'Dew point',
+        value:
+          c.dew_point_2m != null ? Math.round(c.dew_point_2m) + deg : '—',
+      },
       { label: 'UV', value: c.uv_index != null ? String(Math.round(c.uv_index)) : '—' },
       { label: 'Visibility', value: W.formatVis(c.visibility, units) },
       { label: 'Precip', value: formatPrecip(c.precipitation) },
