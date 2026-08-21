@@ -1,0 +1,3 @@
+• Auto-refresh weather when you return to the app (fixes stale Clear/conditions)
+• Maps: 12-hour rain outlook bars at your pin (model forecast — RainViewer nowcast is only ~30m and often empty)
+• Radar timeline labels “now” / “forecast”; reload radar every 5 minutes

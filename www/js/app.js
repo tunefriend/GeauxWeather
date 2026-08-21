@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.8';
+  const APP_VERSION = '1.0.9';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -1414,6 +1414,44 @@
     }
   }
 
+  /** Auto-refresh current conditions so Today doesn't stay stuck on cached Clear/etc. */
+  const WEATHER_REFRESH_MS = 15 * 60 * 1000;
+  const WEATHER_STALE_MS = 10 * 60 * 1000;
+  let weatherRefreshTimer = null;
+
+  async function refreshIfStale(reason) {
+    if (!homeLoc || homeLoc.lat == null) return;
+    const age = lastUpdatedAt ? Date.now() - lastUpdatedAt : Infinity;
+    if (age < WEATHER_STALE_MS) return;
+    try {
+      await loadHomeWeather(homeLoc, true, { forceMapView: false });
+    } catch (e) {
+      console.warn('auto weather refresh failed', reason, e);
+    }
+  }
+
+  function startWeatherAutoRefresh() {
+    if (weatherRefreshTimer) clearInterval(weatherRefreshTimer);
+    weatherRefreshTimer = setInterval(function () {
+      if (document.visibilityState === 'visible') {
+        refreshIfStale('interval');
+      }
+    }, WEATHER_REFRESH_MS);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      refreshIfStale('visible');
+      if (window.PureSkyMaps && typeof window.PureSkyMaps.reloadRadar === 'function') {
+        window.PureSkyMaps.reloadRadar();
+      }
+    }
+  });
+  window.addEventListener('pageshow', function () {
+    refreshIfStale('pageshow');
+  });
+
   boot();
+  startWeatherAutoRefresh();
   console.log('PureSky · home vs pin · Places tab');
 })();

@@ -290,3 +290,29 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
+
+.rain-outlook {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(14, 22, 34, 0.7);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+}
+.rain-outlook.hidden { display: none; }
+.rain-outlook-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px;
+}
+.rain-outlook-title { font-size: 0.78rem; font-weight: 600; }
+.rain-outlook-bars {
+  display: flex; gap: 3px; align-items: flex-end; height: 52px; overflow-x: auto;
+}
+.rain-hour {
+  flex: 1 0 0; min-width: 1.35rem; max-width: 2.2rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%;
+}
+.rain-hour-bar {
+  width: 100%; border-radius: 3px 3px 1px 1px; background: rgba(94, 164, 240, 0.85); min-height: 2px;
+}
+.rain-hour-bar.is-wet { background: rgba(61, 139, 253, 0.95); }
+.rain-hour-bar.is-heavy { background: rgba(232, 93, 76, 0.9); }
+.rain-hour-label { font-size: 0.55rem; color: rgba(200,214,230,0.78); line-height: 1; }

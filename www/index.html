@@ -118,6 +118,13 @@
           <input type="range" id="radar-slider" class="radar-slider" min="0" max="0" value="0" />
           <span id="radar-time" class="radar-time">—</span>
         </div>
+        <div id="rain-outlook" class="rain-outlook hidden" aria-live="polite">
+          <div class="rain-outlook-head">
+            <span class="rain-outlook-title">Rain next 12h at pin</span>
+            <span class="rain-outlook-sub muted small" id="rain-outlook-sub">Open-Meteo hourly</span>
+          </div>
+          <div id="rain-outlook-bars" class="rain-outlook-bars"></div>
+        </div>
         <div id="map-info" class="map-info hidden"></div>
         <div class="map-legend muted small" id="map-legend">Tap map to pin · RainViewer</div>
       </section>
@@ -197,7 +204,7 @@
         </div>
         <p class="settings-hint muted small">Feedback opens email · Donate opens Liberapay · Website opens geauxweather.com</p>
         <div class="settings-group">
-          <p class="muted small" id="app-about">GeauxWeather · v1.0.8 · GPL-3.0 · Open-Meteo · No tracking</p>
+          <p class="muted small" id="app-about">GeauxWeather · v1.0.9 · GPL-3.0 · Open-Meteo · No tracking</p>
         </div>
       </section>
     </main>

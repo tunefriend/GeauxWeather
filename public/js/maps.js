@@ -32,11 +32,14 @@
   let radarTimer = null;
   let fadeRaf = null;
   let radarFrames = [];
+  let radarPastCount = 0; // frames that are observed (not nowcast)
   let frameIndex = 0;
   let playing = false;
   let fading = false;
   let currentLayer = 'radar';
   let lastLoc = null;
+  let radarRefreshTimer = null;
+  let rainOutlookFetchId = 0;
   let lastForecast = null;
   let controlsWired = false;
   let mapEventsWired = false;
@@ -172,9 +175,10 @@
       color: loc.pinned ? '#e85d4c' : '#5b9fd4',
       fillColor: loc.pinned ? '#e85d4c' : '#5b9fd4',
     });
-    // Refresh storm bolts when the weather pin moves
+    // Refresh storm bolts / rain outlook when the weather pin moves
     if (currentLayer === 'radar') {
       loadRadarStormOverlay();
+      loadRainOutlook();
     } else if (currentLayer === 'lightning') {
       loadLightning();
     }
@@ -287,12 +291,19 @@
 
     if (timeEl && radarFrames[frameIndex] && radarFrames[frameIndex].time) {
       const t = new Date(radarFrames[frameIndex].time * 1000);
-      timeEl.textContent = t.toLocaleString([], {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
+      const tag =
+        frameIndex >= radarPastCount
+          ? ' · forecast'
+          : frameIndex === radarPastCount - 1
+            ? ' · now'
+            : '';
+      timeEl.textContent =
+        t.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        }) + tag;
     } else if (timeEl) {
       timeEl.textContent = '—';
     }
@@ -306,9 +317,15 @@
           !legend.textContent ||
           legend.textContent.indexOf('⚡') < 0)
       ) {
+        const nc = Math.max(0, radarFrames.length - radarPastCount);
         legend.textContent = playing
-          ? 'Playing rain & snow radar · RainViewer'
-          : 'Rain & snow · RainViewer · tap map to pin';
+          ? 'Playing radar · ' +
+            (nc
+              ? radarPastCount + ' past + ' + nc + ' nowcast'
+              : '~2h observed · RainViewer')
+          : nc
+            ? 'Rain/snow · past + short nowcast · RainViewer'
+            : 'Rain/snow · ~2h observed (nowcast often empty) · see 12h bars';
       }
     }
   }
@@ -316,26 +333,168 @@
   function setControlsVisible(show) {
     const bar = $('radar-controls');
     if (bar) bar.classList.toggle('hidden', !show);
+    const outlook = $('rain-outlook');
+    if (outlook) {
+      if (show && currentLayer === 'radar') {
+        outlook.classList.remove('hidden');
+      } else {
+        outlook.classList.add('hidden');
+      }
+    }
   }
 
-  async function loadRadarFrames() {
+  function stopRadarRefresh() {
+    if (radarRefreshTimer) {
+      clearInterval(radarRefreshTimer);
+      radarRefreshTimer = null;
+    }
+  }
+
+  function startRadarRefresh() {
+    stopRadarRefresh();
+    // RainViewer tiles refresh about every 5–10 minutes
+    radarRefreshTimer = setInterval(function () {
+      if (currentLayer === 'radar') {
+        loadRadarFrames({ keepTime: true });
+        loadRainOutlook();
+      }
+    }, 5 * 60 * 1000);
+  }
+
+  async function loadRadarFrames(opts) {
+    opts = opts || {};
     try {
-      const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+      const res = await fetch(
+        'https://api.rainviewer.com/public/weather-maps.json',
+        { cache: 'no-cache' }
+      );
       if (!res.ok) throw new Error('RainViewer ' + res.status);
       const json = await res.json();
       const past = (json.radar && json.radar.past) || [];
       const nowcast = (json.radar && json.radar.nowcast) || [];
+      const prevTime =
+        opts.keepTime && radarFrames[frameIndex]
+          ? radarFrames[frameIndex].time
+          : null;
+      radarPastCount = past.length;
       radarFrames = past.concat(nowcast);
       if (!radarFrames.length) {
         updateControlsUI();
         return;
       }
-      frameIndex = Math.max(0, past.length - 1);
+      if (prevTime != null) {
+        let nearest = Math.max(0, past.length - 1);
+        let best = Infinity;
+        for (let i = 0; i < radarFrames.length; i++) {
+          const d = Math.abs(radarFrames[i].time - prevTime);
+          if (d < best) {
+            best = d;
+            nearest = i;
+          }
+        }
+        frameIndex = nearest;
+      } else {
+        // Prefer latest observed frame (end of past), not a stale mid-timeline
+        frameIndex = Math.max(0, past.length - 1);
+      }
       showRadarFrame(frameIndex, false);
+      loadRainOutlook();
     } catch (err) {
       console.warn('Radar load failed', err);
       const legend = $('map-legend');
       if (legend) legend.textContent = 'Radar unavailable (offline?)';
+    }
+  }
+
+  /** Hourly rain outlook at pin — RainViewer free nowcast is only ~30m (often empty). */
+  async function loadRainOutlook() {
+    const box = $('rain-outlook');
+    const bars = $('rain-outlook-bars');
+    const sub = $('rain-outlook-sub');
+    if (!box || !bars || currentLayer !== 'radar') return;
+    const origin = lastLoc;
+    if (!origin || origin.lat == null || origin.lon == null) {
+      box.classList.remove('hidden');
+      bars.innerHTML =
+        '<p class="muted small" style="margin:0">Drop a pin or set weather location for the 12h rain outlook.</p>';
+      return;
+    }
+    const myId = ++rainOutlookFetchId;
+    box.classList.remove('hidden');
+    const units =
+      (typeof localStorage !== 'undefined' && localStorage.getItem('units')) ||
+      'imperial';
+    const precipUnit = units === 'metric' ? 'mm' : 'inch';
+    try {
+      const url =
+        'https://api.open-meteo.com/v1/forecast?latitude=' +
+        encodeURIComponent(origin.lat) +
+        '&longitude=' +
+        encodeURIComponent(origin.lon) +
+        '&hourly=precipitation,precipitation_probability' +
+        '&precipitation_unit=' +
+        precipUnit +
+        '&forecast_hours=12&timezone=auto';
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('outlook ' + res.status);
+      const json = await res.json();
+      if (myId !== rainOutlookFetchId || currentLayer !== 'radar') return;
+      const times = (json.hourly && json.hourly.time) || [];
+      const precip = (json.hourly && json.hourly.precipitation) || [];
+      const prob = (json.hourly && json.hourly.precipitation_probability) || [];
+      const n = Math.min(12, times.length, precip.length);
+      if (!n) {
+        bars.innerHTML = '<p class="muted small" style="margin:0">No hourly rain data</p>';
+        return;
+      }
+      let maxP = 0;
+      for (let i = 0; i < n; i++) {
+        const p = Number(precip[i]) || 0;
+        if (p > maxP) maxP = p;
+      }
+      if (maxP < 0.01) maxP = units === 'metric' ? 2 : 0.1;
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        const p = Number(precip[i]) || 0;
+        const pr = prob[i] != null ? Number(prob[i]) : null;
+        const h = Math.max(4, Math.round((p / maxP) * 36));
+        const cls =
+          p >= (units === 'metric' ? 2 : 0.1)
+            ? 'is-heavy'
+            : p > 0 || (pr != null && pr >= 40)
+              ? 'is-wet'
+              : '';
+        const t = new Date(times[i]);
+        const label = t.toLocaleTimeString([], { hour: 'numeric' });
+        const tip =
+          label +
+          ' · ' +
+          (p > 0 ? p.toFixed(units === 'metric' ? 1 : 2) + ' ' + precipUnit : 'dry') +
+          (pr != null ? ' · ' + Math.round(pr) + '%' : '');
+        html +=
+          '<div class="rain-hour" title="' +
+          tip.replace(/"/g, '&quot;') +
+          '">' +
+          '<div class="rain-hour-bar ' +
+          cls +
+          '" style="height:' +
+          h +
+          'px"></div>' +
+          '<span class="rain-hour-label">' +
+          label.replace(/\s/g, '') +
+          '</span></div>';
+      }
+      bars.innerHTML = html;
+      if (sub) {
+        sub.textContent =
+          'Model forecast · not radar animation · ' +
+          (origin.label || 'pin');
+      }
+    } catch (err) {
+      console.warn('Rain outlook failed', err);
+      if (myId !== rainOutlookFetchId) return;
+      bars.innerHTML =
+        '<p class="muted small" style="margin:0">Could not load 12h rain outlook</p>';
     }
   }
 
@@ -475,10 +634,13 @@
   function clearRadar() {
     pausePlayback();
     cancelFade();
+    stopRadarRefresh();
     if (radarFront && map) {
       map.removeLayer(radarFront);
       radarFront = null;
     }
+    const outlook = $('rain-outlook');
+    if (outlook) outlook.classList.add('hidden');
   }
 
   // ─── Wind field (Open-Meteo grid + particles) ───────────────────────────
@@ -1730,7 +1892,7 @@
 
     try {
       // Always revalidate so SW/cache updates ship
-      const res = await fetch('/data/eclipses.json?v=3', { cache: 'no-cache' });
+      const res = await fetch('/data/eclipses.json?v=2', { cache: 'no-cache' });
       if (!res.ok) throw new Error('eclipses ' + res.status);
       eclipseData = await res.json();
       if (myId !== eclipseFetchId || currentLayer !== 'eclipse') return;
@@ -1979,8 +2141,6 @@
       ];
 
       async function fetchUsgsJson(url) {
-        // Direct fetch — USGS sends Access-Control-Allow-Origin: *
-        // (avoid PureSkyNet so a proxy/HTML error page is easier to detect)
         const res = await fetch(url, {
           cache: 'no-cache',
           headers: { Accept: 'application/json' },
@@ -2782,7 +2942,9 @@
         if (radarFront && map && !map.hasLayer(radarFront)) {
           radarFront.addTo(map);
         }
+        loadRainOutlook();
       }
+      startRadarRefresh();
       const legend = $('map-legend');
       if (legend) {
         legend.textContent = 'Rain & snow radar · loading ⚡ cells…';
@@ -2838,6 +3000,13 @@
     setLayer(currentLayer);
   }
 
+  function reloadRadar() {
+    if (currentLayer !== 'radar') return;
+    loadRadarFrames({ keepTime: true });
+    loadRainOutlook();
+    loadRadarStormOverlay();
+  }
+
   global.PureSkyMaps = {
     init: init,
     onShow: onShow,
@@ -2848,9 +3017,6 @@
     recenter: recenter,
     dropPin: dropPin,
     updatePinHint: updatePinHint,
+    reloadRadar: reloadRadar,
   };
 })(window);
-
-/* geauxweather-maps-build 1786432800 rivers-v2 */
-
-/* storm-overlay-v1 build 1786434200 */

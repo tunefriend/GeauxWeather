@@ -1665,6 +1665,64 @@ button.setting-btn:active {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.rain-outlook {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.rain-outlook.hidden { display: none; }
+.rain-outlook-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.rain-outlook-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.rain-outlook-bars {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 52px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.rain-hour {
+  flex: 1 0 0;
+  min-width: 1.35rem;
+  max-width: 2.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 100%;
+}
+.rain-hour-bar {
+  width: 100%;
+  border-radius: 3px 3px 1px 1px;
+  background: rgba(94, 164, 240, 0.85);
+  min-height: 2px;
+}
+.rain-hour-bar.is-wet {
+  background: rgba(61, 139, 253, 0.95);
+}
+.rain-hour-bar.is-heavy {
+  background: rgba(232, 93, 76, 0.9);
+}
+.rain-hour-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Pull-to-refresh */
 .pull-indicator {
