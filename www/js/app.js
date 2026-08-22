@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.10';
+  const APP_VERSION = '1.0.11';
 
   const screens = {
     today: document.getElementById('screen-today'),

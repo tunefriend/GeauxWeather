@@ -1,0 +1,2 @@
+• Rivers map: stop clipping stage chips (no more “L” instead of Low)
+• Chips show stage + rising/falling; color = low/high/flood (tap for full details)

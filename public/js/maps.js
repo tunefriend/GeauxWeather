@@ -2259,17 +2259,21 @@
         const color = riverStageColor(g.level.key, g.stage);
         const stageStr =
           g.stage != null ? Math.round(g.stage * 10) / 10 + ' ft' : '—';
+        // Keep chips short so Leaflet iconSize doesn't clip "Low"/"High".
+        // Border color already encodes low/normal/high; only FLOOD is spelled out.
+        const arrow =
+          g.trend && (g.trend.key === 'rising' || g.trend.key === 'falling')
+            ? g.trend.arrow
+            : '';
         const chip =
           stageStr +
-          ' ' +
-          (g.trend.arrow || '') +
-          (g.level.key === 'flood'
-            ? ' FLOOD'
-            : g.level.key === 'high'
-              ? ' High'
-              : g.level.key === 'low'
-                ? ' Low'
-                : '');
+          (arrow ? ' ' + arrow : '') +
+          (g.level.key === 'flood' ? ' FLOOD' : '');
+        // ~7.2px per char + padding; clamp so anchors stay sane
+        const chipW = Math.min(
+          148,
+          Math.max(70, Math.ceil(String(chip).length * 7.4) + 20)
+        );
         const icon = L.divIcon({
           className: 'river-marker-icon',
           html:
@@ -2278,8 +2282,8 @@
             '"><span class="river-stage">' +
             escapeHtml(chip.trim()) +
             '</span></div>',
-          iconSize: [92, 28],
-          iconAnchor: [46, 14],
+          iconSize: [chipW, 28],
+          iconAnchor: [Math.round(chipW / 2), 14],
         });
         const flowStr =
           g.flow != null
@@ -2390,7 +2394,7 @@
       }
       if (legend) {
         legend.textContent =
-          'Blue=low · green=normal · yellow=high · red=flood · arrows = rising/falling';
+          'Stage + ↑↓ on chips · border color = low/normal/high/flood';
       }
     } catch (err) {
       console.warn('River stages failed', err);
