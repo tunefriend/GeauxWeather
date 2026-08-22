@@ -258,9 +258,34 @@
       });
     }
     if (slider) {
-      slider.addEventListener('input', function () {
+      function onSlider() {
         pausePlayback();
-        showRadarFrame(parseInt(slider.value, 10) || 0, false);
+        const v = parseInt(slider.value, 10);
+        showRadarFrame(isNaN(v) ? 0 : v, false);
+      }
+      slider.addEventListener('input', onSlider);
+      slider.addEventListener('change', onSlider);
+      // Keep page pull-to-refresh / map gestures from eating the scrubber
+      ['touchstart', 'touchmove', 'pointerdown'].forEach(function (ev) {
+        slider.addEventListener(
+          ev,
+          function (e) {
+            e.stopPropagation();
+          },
+          { passive: true }
+        );
+      });
+    }
+    const radarBar = $('radar-controls');
+    if (radarBar) {
+      ['touchstart', 'touchmove'].forEach(function (ev) {
+        radarBar.addEventListener(
+          ev,
+          function (e) {
+            e.stopPropagation();
+          },
+          { passive: true }
+        );
       });
     }
     if (recenterBtn) {

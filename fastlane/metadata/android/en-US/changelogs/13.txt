@@ -1,0 +1,2 @@
+• Maps: stop pull-to-refresh from fighting map pans (no more mid-scroll weather reload)
+• Rain radar time scrubber: larger thumb, touch-action fix so it actually scrubs

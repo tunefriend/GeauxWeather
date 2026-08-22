@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.11';
+  const APP_VERSION = '1.0.12';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -1325,24 +1325,50 @@
   }
 
   // Pull-to-refresh → same as header refresh (GPS or default)
+  // Important: Maps tab keeps #screens at scrollTop 0, so pull-to-refresh used to
+  // fire while panning the map (Pieter feedback). Skip on Maps / map chrome.
   (function setupPullRefresh() {
     const scroller = document.getElementById('screens');
+    if (!scroller) return;
     const indicator = document.createElement('div');
     indicator.className = 'pull-indicator';
     indicator.id = 'pull-indicator';
     indicator.textContent = 'Pull to refresh';
-    if (scroller && scroller.firstChild) {
+    if (scroller.firstChild) {
       scroller.insertBefore(indicator, scroller.firstChild);
-    } else if (scroller) {
+    } else {
       scroller.appendChild(indicator);
     }
     let startY = 0;
     let pulling = false;
     const THRESHOLD = 70;
 
+    function mapsScreenActive() {
+      const maps = document.getElementById('screen-maps');
+      return !!(maps && maps.classList.contains('active'));
+    }
+
+    function touchOnMapUi(target) {
+      if (!target || !target.closest) return false;
+      return !!(
+        target.closest('#map') ||
+        target.closest('.leaflet-container') ||
+        target.closest('#radar-controls') ||
+        target.closest('#rain-outlook') ||
+        target.closest('.map-toolbar') ||
+        target.closest('.map-pin-bar') ||
+        target.closest('#map-info') ||
+        target.closest('#map-legend')
+      );
+    }
+
     scroller.addEventListener(
       'touchstart',
       function (e) {
+        if (mapsScreenActive() || touchOnMapUi(e.target)) {
+          pulling = false;
+          return;
+        }
         if (scroller.scrollTop <= 0) {
           startY = e.touches[0].clientY;
           pulling = true;
@@ -1354,6 +1380,11 @@
       'touchmove',
       function (e) {
         if (!pulling) return;
+        if (mapsScreenActive() || touchOnMapUi(e.target)) {
+          pulling = false;
+          indicator.classList.remove('visible');
+          return;
+        }
         const dy = e.touches[0].clientY - startY;
         if (dy > 10 && scroller.scrollTop <= 0) {
           indicator.classList.add('visible');
@@ -1372,6 +1403,7 @@
           : 0) - startY;
       indicator.classList.remove('visible');
       indicator.textContent = 'Pull to refresh';
+      if (mapsScreenActive()) return;
       if (dy > THRESHOLD) refreshHome();
     });
   })();

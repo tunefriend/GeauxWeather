@@ -1655,7 +1655,39 @@ button.setting-btn:active {
   flex: 1;
   min-width: 0;
   accent-color: var(--accent);
-  height: 28px;
+  height: 32px;
+  touch-action: none; /* scrub horizontally without page/map stealing the gesture */
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.radar-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.radar-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0b0f14;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+.radar-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.radar-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0b0f14;
 }
 .radar-time {
   flex-shrink: 0;
