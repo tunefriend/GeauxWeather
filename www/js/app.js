@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.12';
+  const APP_VERSION = '1.0.13';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -495,6 +495,21 @@
         pop != null && pop > 0
           ? '<div class="hour-pop">' + pop + '%</div>'
           : '<div class="hour-pop dim">—</div>';
+      const windSp =
+        h.wind_speed_10m && h.wind_speed_10m[i] != null
+          ? Math.round(h.wind_speed_10m[i])
+          : null;
+      const windD =
+        h.wind_direction_10m && h.wind_direction_10m[i] != null
+          ? W.windDir(h.wind_direction_10m[i])
+          : '';
+      const windHtml =
+        windSp != null
+          ? '<div class="hour-wind" title="Wind">' +
+            windSp +
+            (windD ? ' ' + windD : '') +
+            '</div>'
+          : '<div class="hour-wind dim">—</div>';
       cards.push(
         '<div class="hour-card"><div class="hour-time">' +
           label +
@@ -503,6 +518,7 @@
           '</div><div class="hour-temp">' +
           Math.round(h.temperature_2m[i]) +
           '°</div>' +
+          windHtml +
           popHtml +
           '</div>'
       );
@@ -528,6 +544,23 @@
           : '—';
       const sunrise = formatTimeISO(d.sunrise ? d.sunrise[i] : null);
       const sunset = formatTimeISO(d.sunset ? d.sunset[i] : null);
+      const windU = units === 'metric' ? 'km/h' : 'mph';
+      const windMax =
+        d.wind_speed_10m_max && d.wind_speed_10m_max[i] != null
+          ? Math.round(d.wind_speed_10m_max[i])
+          : null;
+      const windDirDaily =
+        d.wind_direction_10m_dominant && d.wind_direction_10m_dominant[i] != null
+          ? W.windDir(d.wind_direction_10m_dominant[i])
+          : '';
+      const windLabel =
+        windMax != null
+          ? windMax + (windDirDaily ? ' ' + windDirDaily : '')
+          : '—';
+      const windDetail =
+        windMax != null
+          ? windMax + ' ' + windU + (windDirDaily ? ' ' + windDirDaily : '')
+          : '—';
 
       return (
         '<div class="day-block">' +
@@ -540,6 +573,9 @@
         '</div>' +
         '<div class="day-pop">' +
         (popVal != null && popVal > 0 ? pop : '') +
+        '</div>' +
+        '<div class="day-wind" title="Max wind">' +
+        (windMax != null ? windLabel : '') +
         '</div>' +
         '<div class="day-temps">' +
         '<span class="day-high">' +
@@ -558,6 +594,9 @@
         '</strong></div>' +
         '<div><span class="muted">Chance</span><strong>' +
         pop +
+        '</strong></div>' +
+        '<div><span class="muted">Wind max</span><strong>' +
+        windDetail +
         '</strong></div>' +
         '<div><span class="muted">UV max</span><strong>' +
         uv +

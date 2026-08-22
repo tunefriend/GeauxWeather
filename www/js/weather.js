@@ -51,6 +51,7 @@
         'precipitation_probability',
         'weather_code',
         'wind_speed_10m',
+        'wind_direction_10m',
       ].join(','),
       daily: [
         'weather_code',
@@ -61,6 +62,8 @@
         'uv_index_max',
         'sunrise',
         'sunset',
+        'wind_speed_10m_max',
+        'wind_direction_10m_dominant',
       ].join(','),
       temperature_unit: tempUnit,
       wind_speed_unit: windUnit,

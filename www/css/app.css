@@ -708,7 +708,7 @@ body.sky-mood-default {
   flex: 0 0 auto;
   min-width: 4.5rem;
   width: max-content;
-  max-width: 6.5rem;
+  max-width: 7rem;
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 8px;
@@ -1235,6 +1235,26 @@ button.setting-btn:active {
 .hour-pop.dim {
   color: var(--text-muted);
   opacity: 0.5;
+}
+.hour-wind {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+.hour-wind.dim {
+  opacity: 0.45;
+}
+.day-wind {
+  min-width: 2.6rem;
+  width: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .day-block {

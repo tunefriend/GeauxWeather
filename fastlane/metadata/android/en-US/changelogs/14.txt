@@ -1,0 +1,2 @@
+• Hourly forecast: wind speed + direction (great for cycling / route planning)
+• 10-day: max wind + dominant direction on each day (tap day for full details)
