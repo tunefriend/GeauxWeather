@@ -61,6 +61,9 @@ public final class HurricaneAlertHelper {
     private static final String KEY_SEEN = "geauxweather_severe_seen_native";
     private static final String KEY_LOC = "geauxweather_location";
     private static final String KEY_DEFAULT = "geauxweather_default";
+    private static final String KEY_PENDING_ALERT = "geauxweather_pending_alert";
+    public static final String EXTRA_ALERT_JSON = "geauxweather_alert_json";
+    public static final String ACTION_OPEN_ALERT = "com.geauxweather.app.OPEN_ALERT";
     private static final String NHC_URL = "https://www.nhc.noaa.gov/CurrentStorms.json";
     private static final int BASE_NOTIF_ID = 7000;
     /** Tropical systems farther than this from home are ignored (miles). */
@@ -142,9 +145,33 @@ public final class HurricaneAlertHelper {
     }
 
     public static void showAlert(Context context, String title, String body, String tag) {
+        showAlert(context, title, body, tag, null);
+    }
+
+    public static void showAlert(Context context, String title, String body, String tag, JSONObject detail) {
         ensureChannel(context);
         int id = BASE_NOTIF_ID + Math.abs((tag != null ? tag : title).hashCode() % 500);
-        post(context, id, title, body);
+        if (detail == null) {
+            detail = new JSONObject();
+            try {
+                detail.put("kind", "generic");
+                detail.put("key", tag != null ? tag : title);
+                detail.put("event", title != null ? title : "Severe weather");
+                detail.put("headline", title != null ? title : "");
+                detail.put("description", body != null ? body : "");
+                detail.put("layer", "tornado");
+            } catch (Exception ignored) {
+            }
+        }
+        post(context, id, title, body, detail);
+    }
+
+    /** Pending alert JSON for MainActivity → WebView deep link (cleared when consumed). */
+    public static String takePendingAlertJson(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String raw = prefs.getString(KEY_PENDING_ALERT, null);
+        if (raw != null) prefs.edit().remove(KEY_PENDING_ALERT).apply();
+        return raw;
     }
 
     // ─── NWS local alerts ─────────────────────────────────────────────────
@@ -202,11 +229,38 @@ public final class HurricaneAlertHelper {
             if (placeLabel != null && !placeLabel.isEmpty()) {
                 text = text + " · near " + placeLabel;
             }
+            String description = props.optString("description", "");
+            String instruction = props.optString("instruction", "");
+            String ends = props.optString("ends", props.optString("expires", ""));
+            String more = text;
+            if (!instruction.isEmpty()) {
+                more = text + "\n\n" + trimLen(instruction, 400);
+            } else if (!description.isEmpty()) {
+                more = text + "\n\n" + trimLen(description, 400);
+            }
+            JSONObject detail = new JSONObject();
+            try {
+                detail.put("kind", "nws");
+                detail.put("key", key);
+                detail.put("event", event);
+                detail.put("headline", headline);
+                detail.put("area", area);
+                detail.put("severity", severity);
+                detail.put("description", trimLen(description, 1200));
+                detail.put("instruction", trimLen(instruction, 800));
+                detail.put("ends", ends);
+                detail.put("lat", lat);
+                detail.put("lon", lon);
+                detail.put("place", placeLabel != null ? placeLabel : "");
+                detail.put("layer", mapLayerForEvent(event));
+            } catch (Exception ignored) {
+            }
             post(
                     context,
                     BASE_NOTIF_ID + Math.abs(key.hashCode() % 500),
                     title,
-                    text
+                    more,
+                    detail
             );
         }
     }
@@ -216,6 +270,9 @@ public final class HurricaneAlertHelper {
         String e = event.toLowerCase(Locale.US);
         return e.contains("tornado")
                 || e.contains("severe thunderstorm")
+                || e.contains("flash flood")
+                || e.contains("flood warning")
+                || e.contains("flood emergency")
                 || e.contains("hurricane")
                 || e.contains("tropical storm")
                 || e.contains("tropical depression")
@@ -280,13 +337,31 @@ public final class HurricaneAlertHelper {
             JSONObject old = prev.optJSONObject(key);
             String near = Math.round(distMi) + " mi from " + (placeLabel != null && !placeLabel.isEmpty() ? placeLabel : "you");
             if (old == null) {
+                JSONObject detail = new JSONObject();
+                try {
+                    detail.put("kind", "nhc");
+                    detail.put("key", key);
+                    detail.put("event", "Tropical cyclone");
+                    detail.put("headline", classification + " " + name);
+                    detail.put("description", near + (intensity.isEmpty() ? "" : " · " + intensity + " kt"));
+                    detail.put("lat", slat);
+                    detail.put("lon", slon);
+                    detail.put("place", placeLabel != null ? placeLabel : "");
+                    detail.put("layer", "hurricane");
+                    detail.put("name", name);
+                    detail.put("classification", classification);
+                    detail.put("intensity", intensity);
+                    detail.put("distMi", Math.round(distMi));
+                } catch (Exception ignored) {
+                }
                 post(
                         context,
                         BASE_NOTIF_ID + Math.abs(key.hashCode() % 500),
                         "Tropical cyclone near you",
                         classification + " " + name
                                 + (intensity.isEmpty() ? "" : " · " + intensity + " kt")
-                                + " · " + near
+                                + " · " + near,
+                        detail
                 );
             } else {
                 String oldAdv = old.optString("adv", "");
@@ -378,30 +453,60 @@ public final class HurricaneAlertHelper {
         return R * c;
     }
 
+    private static String trimLen(String s, int max) {
+        if (s == null) return "";
+        s = s.trim();
+        if (s.length() <= max) return s;
+        return s.substring(0, max - 1) + "…";
+    }
+
+    private static String mapLayerForEvent(String event) {
+        String e = event != null ? event.toLowerCase(Locale.US) : "";
+        if (e.contains("tornado")) return "tornado";
+        if (e.contains("hurricane") || e.contains("tropical")) return "hurricane";
+        if (e.contains("thunder") || e.contains("flood")) return "lightning";
+        return "tornado";
+    }
+
     private static void post(Context context, int id, String title, String body) {
-        Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-        PendingIntent pi = null;
-        if (launch != null) {
-            launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            pi = PendingIntent.getActivity(
-                    context,
-                    id,
-                    launch,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
+        post(context, id, title, body, null);
+    }
+
+    private static void post(Context context, int id, String title, String body, JSONObject detail) {
+        Intent launch = new Intent(context, MainActivity.class);
+        launch.setAction(ACTION_OPEN_ALERT);
+        launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (detail != null) {
+            String json = detail.toString();
+            launch.putExtra(EXTRA_ALERT_JSON, json);
+            // Persist so WebView can read even if activity was already alive / cold-start race
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_PENDING_ALERT, json)
+                    .apply();
         }
+        PendingIntent pi = PendingIntent.getActivity(
+                context,
+                id,
+                launch,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        String preview = body != null ? body : "";
+        // One-line notification preview (first line only)
+        int nl = preview.indexOf('\n');
+        String shortText = nl > 0 ? preview.substring(0, nl) : preview;
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_rain)
                 .setContentTitle(title != null ? title : "Severe weather")
-                .setContentText(body != null ? body : "")
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentText(shortText)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(preview))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
-                .setOnlyAlertOnce(true);
-
-        if (pi != null) b.setContentIntent(pi);
+                .setOnlyAlertOnce(true)
+                .setContentIntent(pi);
 
         try {
             NotificationManagerCompat.from(context).notify(id, b.build());
@@ -416,7 +521,7 @@ public final class HurricaneAlertHelper {
                 "Severe storm alerts",
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        ch.setDescription("Tornado, severe thunderstorm, and nearby tropical cyclone alerts for your location");
+        ch.setDescription("Tornado, severe thunderstorm, flash flood, and nearby tropical cyclone alerts for your location");
         ch.setShowBadge(true);
         NotificationManager nm = context.getSystemService(NotificationManager.class);
         if (nm != null) nm.createNotificationChannel(ch);

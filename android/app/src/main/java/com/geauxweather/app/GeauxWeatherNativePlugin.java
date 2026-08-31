@@ -86,7 +86,12 @@ public class GeauxWeatherNativePlugin extends Plugin {
             String title = call.getString("title", "Severe weather");
             String body = call.getString("body", "");
             String tag = call.getString("tag", "severe");
-            HurricaneAlertHelper.showAlert(getContext(), title, body, tag);
+            org.json.JSONObject detail = null;
+            com.getcapacitor.JSObject detailObj = call.getObject("detail", null);
+            if (detailObj != null) {
+                detail = new org.json.JSONObject(detailObj.toString());
+            }
+            HurricaneAlertHelper.showAlert(getContext(), title, body, tag, detail);
             call.resolve();
         } catch (Exception e) {
             call.reject("showHurricaneAlert failed: " + e.getMessage());

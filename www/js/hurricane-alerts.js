@@ -177,12 +177,23 @@
     return (
       e.indexOf('tornado') >= 0 ||
       e.indexOf('severe thunderstorm') >= 0 ||
+      e.indexOf('flash flood') >= 0 ||
+      e.indexOf('flood warning') >= 0 ||
+      e.indexOf('flood emergency') >= 0 ||
       e.indexOf('hurricane') >= 0 ||
       e.indexOf('tropical storm') >= 0 ||
       e.indexOf('tropical depression') >= 0 ||
       e.indexOf('storm surge') >= 0 ||
       e.indexOf('extreme wind') >= 0
     );
+  }
+
+  function mapLayerForEvent(event) {
+    const e = (event || '').toLowerCase();
+    if (e.indexOf('tornado') >= 0) return 'tornado';
+    if (e.indexOf('hurricane') >= 0 || e.indexOf('tropical') >= 0) return 'hurricane';
+    if (e.indexOf('thunder') >= 0 || e.indexOf('flood') >= 0) return 'lightning';
+    return 'tornado';
   }
 
   async function netFetch(url, as) {
@@ -254,14 +265,34 @@
       next[key] = { event: p.event, headline: p.headline || '' };
       if (seedOnly) continue;
       if (prev[key]) continue;
+      const instruction = p.instruction || '';
+      const description = p.description || '';
+      let body =
+        (p.severity ? p.severity + ' · ' : '') +
+        (p.areaDesc || place) +
+        ' · near ' +
+        place;
+      if (instruction) body += '\n\n' + String(instruction).slice(0, 400);
+      else if (description) body += '\n\n' + String(description).slice(0, 400);
       alerts.push({
         title: p.event || 'Severe weather',
-        body:
-          (p.severity ? p.severity + ' · ' : '') +
-          (p.areaDesc || place) +
-          ' · near ' +
-          place,
+        body: body,
         id: key,
+        detail: {
+          kind: 'nws',
+          key: key,
+          event: p.event || 'Severe weather',
+          headline: p.headline || p.event || '',
+          area: p.areaDesc || place,
+          severity: p.severity || '',
+          description: String(description).slice(0, 1200),
+          instruction: String(instruction).slice(0, 800),
+          ends: p.ends || p.expires || '',
+          lat: loc.lat,
+          lon: loc.lon,
+          place: place,
+          layer: mapLayerForEvent(p.event),
+        },
       });
     }
 
@@ -286,6 +317,21 @@
       if (seedOnly) continue;
       const old = prev[key];
       const near = Math.round(t.distMi) + ' mi from ' + place;
+      const stormDetail = {
+        kind: 'nhc',
+        key: key,
+        event: 'Tropical cyclone',
+        headline: (fp.classification || 'Storm') + ' ' + fp.name,
+        description: near + (fp.intensity ? ' · ' + fp.intensity + ' kt' : ''),
+        lat: s.latitudeNumeric,
+        lon: s.longitudeNumeric,
+        place: place,
+        layer: 'hurricane',
+        name: fp.name,
+        classification: fp.classification,
+        intensity: fp.intensity,
+        distMi: fp.distMi,
+      };
       if (!old) {
         alerts.push({
           title: 'Tropical cyclone near you',
@@ -297,12 +343,16 @@
             ' · ' +
             near,
           id: key,
+          detail: stormDetail,
         });
       } else if (old.adv !== fp.adv && fp.adv) {
         alerts.push({
           title: fp.name + ' — new advisory',
           body: 'Advisory #' + fp.adv + ' · ' + near,
           id: key + '-adv-' + fp.adv,
+          detail: Object.assign({}, stormDetail, {
+            headline: fp.name + ' — advisory #' + fp.adv,
+          }),
         });
       } else if (
         old.intensity &&
@@ -313,6 +363,11 @@
           title: fp.name + ' strengthened',
           body: old.intensity + ' → ' + fp.intensity + ' kt · ' + near,
           id: key + '-int-' + fp.intensity,
+          detail: Object.assign({}, stormDetail, {
+            headline: fp.name + ' strengthened',
+            description:
+              old.intensity + ' → ' + fp.intensity + ' kt · ' + near,
+          }),
         });
       }
     }
@@ -321,7 +376,7 @@
     return alerts;
   }
 
-  async function notifyNative(title, body, tag) {
+  async function notifyNative(title, body, tag, detail) {
     try {
       if (
         global.Capacitor &&
@@ -330,11 +385,15 @@
         typeof global.Capacitor.Plugins.GeauxWeatherNative.showHurricaneAlert ===
           'function'
       ) {
-        await global.Capacitor.Plugins.GeauxWeatherNative.showHurricaneAlert({
+        const payload = {
           title: title,
           body: body,
           tag: tag || 'severe',
-        });
+        };
+        if (detail) payload.detail = detail;
+        await global.Capacitor.Plugins.GeauxWeatherNative.showHurricaneAlert(
+          payload
+        );
         return true;
       }
     } catch (e) {
@@ -382,7 +441,12 @@
       const alerts = diffAndCollect(loc, nws, tropical, { seedOnly: firstRun });
       if (!firstRun) {
         for (let i = 0; i < alerts.length; i++) {
-          await notifyNative(alerts[i].title, alerts[i].body, alerts[i].id);
+          await notifyNative(
+            alerts[i].title,
+            alerts[i].body,
+            alerts[i].id,
+            alerts[i].detail || null
+          );
         }
       }
 
@@ -478,14 +542,158 @@
       if (!hint) return;
       if (loc && loc.label) {
         hint.textContent =
-          'Tornado, severe thunderstorm & nearby hurricanes for ' +
+          'Tornado, severe thunderstorm, flash flood & nearby hurricanes for ' +
           loc.label +
-          ' (home or default). Checks every few hours.';
+          ' (home or default). Tap a notification to open the map + details.';
       } else {
         hint.textContent =
-          'Tornado, severe thunderstorm & nearby tropical storms for your home or default location. Set a location first.';
+          'Tornado, severe thunderstorm, flash flood & nearby tropical storms for your home or default location. Set a location first.';
       }
     });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function ensureAlertSheet() {
+    let sheet = document.getElementById('severe-alert-sheet');
+    if (sheet) return sheet;
+    sheet = document.createElement('div');
+    sheet.id = 'severe-alert-sheet';
+    sheet.className = 'severe-alert-sheet hidden';
+    sheet.innerHTML =
+      '<div class="severe-alert-card" role="dialog" aria-modal="true" aria-labelledby="severe-alert-title">' +
+      '<button type="button" class="severe-alert-close" id="severe-alert-close" aria-label="Close">✕</button>' +
+      '<div class="severe-alert-badge" id="severe-alert-badge">Alert</div>' +
+      '<h2 id="severe-alert-title" class="severe-alert-title">—</h2>' +
+      '<p class="severe-alert-meta muted small" id="severe-alert-meta"></p>' +
+      '<div class="severe-alert-body" id="severe-alert-body"></div>' +
+      '<div class="severe-alert-actions">' +
+      '<button type="button" class="btn btn-primary btn-sm" id="severe-alert-maps">Show on map</button>' +
+      '<button type="button" class="btn btn-secondary btn-sm" id="severe-alert-dismiss">Dismiss</button>' +
+      '</div></div>';
+    document.body.appendChild(sheet);
+    sheet.addEventListener('click', function (e) {
+      if (e.target === sheet) hideAlertSheet();
+    });
+    const closeBtn = document.getElementById('severe-alert-close');
+    const dismissBtn = document.getElementById('severe-alert-dismiss');
+    if (closeBtn) closeBtn.addEventListener('click', hideAlertSheet);
+    if (dismissBtn) dismissBtn.addEventListener('click', hideAlertSheet);
+    return sheet;
+  }
+
+  function hideAlertSheet() {
+    const sheet = document.getElementById('severe-alert-sheet');
+    if (sheet) sheet.classList.add('hidden');
+  }
+
+  function showAlertSheet(detail) {
+    const sheet = ensureAlertSheet();
+    const title = document.getElementById('severe-alert-title');
+    const meta = document.getElementById('severe-alert-meta');
+    const body = document.getElementById('severe-alert-body');
+    const badge = document.getElementById('severe-alert-badge');
+    const mapsBtn = document.getElementById('severe-alert-maps');
+    if (badge) {
+      badge.textContent =
+        detail.severity || detail.event || detail.kind || 'Alert';
+    }
+    if (title) {
+      title.textContent = detail.headline || detail.event || 'Severe weather';
+    }
+    const metaBits = [];
+    if (detail.area) metaBits.push(detail.area);
+    if (detail.place) metaBits.push('near ' + detail.place);
+    if (detail.distMi != null) metaBits.push(detail.distMi + ' mi away');
+    if (detail.ends) {
+      try {
+        metaBits.push(
+          'Until ' +
+            new Date(detail.ends).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+        );
+      } catch (_) {
+        metaBits.push('Until ' + detail.ends);
+      }
+    }
+    if (meta) meta.textContent = metaBits.join(' · ');
+    let html = '';
+    if (detail.instruction) {
+      html +=
+        '<p><strong>What to do</strong><br>' +
+        escapeHtml(detail.instruction).replace(/\n/g, '<br>') +
+        '</p>';
+    }
+    if (detail.description) {
+      html +=
+        '<p class="muted small">' +
+        escapeHtml(detail.description).replace(/\n/g, '<br>') +
+        '</p>';
+    }
+    if (!html) {
+      html = '<p class="muted">Open Maps for nearby severe weather layers.</p>';
+    }
+    if (body) body.innerHTML = html;
+    if (mapsBtn) {
+      mapsBtn.onclick = function () {
+        focusAlertOnMap(detail);
+      };
+    }
+    sheet.classList.remove('hidden');
+  }
+
+  function focusAlertOnMap(detail) {
+    try {
+      // Switch to Maps tab (app.js exposes showScreen via bottom nav click)
+      const mapsNav = document.querySelector('.nav-btn[data-screen="maps"]');
+      if (mapsNav) mapsNav.click();
+      else if (typeof global.__geauxShowScreen === 'function') {
+        global.__geauxShowScreen('maps');
+      }
+    } catch (_) {}
+    const layer = detail.layer || mapLayerForEvent(detail.event) || 'tornado';
+    setTimeout(function () {
+      try {
+        if (global.PureSkyMaps) {
+          if (typeof global.PureSkyMaps.setLayer === 'function') {
+            global.PureSkyMaps.setLayer(layer);
+          }
+          if (
+            detail.lat != null &&
+            detail.lon != null &&
+            typeof global.PureSkyMaps.setLocation === 'function'
+          ) {
+            global.PureSkyMaps.setLocation(
+              {
+                lat: Number(detail.lat),
+                lon: Number(detail.lon),
+                label: detail.place || detail.area || detail.event || 'Alert',
+              },
+              { forceView: true, zoom: 8, animate: true }
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('focusAlertOnMap', e);
+      }
+    }, 120);
+  }
+
+  /** Called from MainActivity when user taps a severe-weather notification. */
+  function openFromNotification(detail) {
+    if (!detail || typeof detail !== 'object') return;
+    showAlertSheet(detail);
+    focusAlertOnMap(detail);
   }
 
   function init() {
@@ -496,6 +704,13 @@
       setTimeout(function () {
         checkNow();
       }, 4000);
+    }
+    // Cold-start deep link queued before this script finished loading
+    if (global.__geauxPendingSevere) {
+      try {
+        openFromNotification(global.__geauxPendingSevere);
+      } catch (_) {}
+      global.__geauxPendingSevere = null;
     }
   }
 
@@ -511,6 +726,8 @@
     checkNow: checkNow,
     startPolling: startPolling,
     stopPolling: stopPolling,
+    openFromNotification: openFromNotification,
   };
   global.PureSkySevereAlerts = global.PureSkyHurricaneAlerts;
+  global.PureSkySevere = global.PureSkyHurricaneAlerts;
 })(window);

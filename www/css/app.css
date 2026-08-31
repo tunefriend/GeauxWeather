@@ -1776,6 +1776,71 @@ button.setting-btn:active {
   font-variant-numeric: tabular-nums;
 }
 
+/* Severe alert sheet (opened from notification tap) */
+.severe-alert-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  padding-bottom: calc(12px + var(--safe-bottom, 0px));
+}
+.severe-alert-sheet.hidden { display: none; }
+.severe-alert-card {
+  width: min(100%, 420px);
+  max-height: min(78vh, 640px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 16px 14px;
+  position: relative;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.severe-alert-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.severe-alert-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0b0f14;
+  background: #f0c14a;
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+}
+.severe-alert-title {
+  font-size: 1.15rem;
+  margin: 0 28px 6px 0;
+  line-height: 1.3;
+}
+.severe-alert-meta { margin: 0 0 10px; }
+.severe-alert-body {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+.severe-alert-body p { margin: 0 0 10px; }
+.severe-alert-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Pull-to-refresh */
 .pull-indicator {
   text-align: center;

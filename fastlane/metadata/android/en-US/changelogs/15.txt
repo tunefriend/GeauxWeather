@@ -1,0 +1,3 @@
+• Tap a severe-weather notification to open Maps at the advisory with details
+• Notification includes more NWS guidance (what to do / description)
+• Flash flood warnings included in severe alerts

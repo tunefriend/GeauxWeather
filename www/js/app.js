@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.13';
+  const APP_VERSION = '1.0.14';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -67,6 +67,8 @@
     const btn = document.querySelector('.nav-btn[data-screen="' + name + '"]');
     if (btn) btn.classList.add('active');
   }
+  // Used by severe-alert deep links from native notifications
+  window.__geauxShowScreen = showScreen;
 
   navBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
