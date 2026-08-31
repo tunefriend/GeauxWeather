@@ -23,7 +23,8 @@ bash install.sh
 
 ## What you get
 
-- **Panel / tray icon** with temperature (AppIndicator)
+- **Panel / tray icon** with weather condition + temperature (AppIndicator)
+- **Units** in the tray menu: Celsius or Fahrenheit
 - Menu: open website · refresh · quit
 - **App menu → GeauxWeather** starts the tray (if already running, opens the website)
 - Autostart at login (standard XDG autostart)
@@ -71,7 +72,7 @@ bash uninstall.sh --purge
   "lat": 30.5021,
   "lon": -90.7476,
   "label": "Livingston, LA",
-  "units": "fahrenheit"
+  "units": "celsius"
 }
 ```
 

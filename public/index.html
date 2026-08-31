@@ -375,7 +375,18 @@
       text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
     }
     .wx-metric .val { font-weight: 600; font-size: 0.95rem; }
-    .wx-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .wx-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .wx-units {
+      display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden;
+      margin-left: auto;
+    }
+    .wx-units button {
+      appearance: none; border: 0; background: transparent; color: var(--muted);
+      font: inherit; font-size: 0.82rem; font-weight: 600; padding: 7px 12px; cursor: pointer;
+    }
+    .wx-units button.active {
+      background: rgba(126, 192, 240, 0.22); color: var(--text);
+    }
     .wx-search { display: flex; gap: 8px; }
     .wx-search input {
       flex: 1; min-width: 0;
@@ -728,6 +739,10 @@
         </div>
         <div class="wx-actions">
           <button type="button" class="btn btn-primary btn-sm" id="wx-geo">Use my location</button>
+          <div class="wx-units" role="group" aria-label="Temperature units">
+            <button type="button" id="wx-units-f" data-units="imperial" title="Fahrenheit">°F</button>
+            <button type="button" id="wx-units-c" data-units="metric" title="Celsius">°C</button>
+          </div>
         </div>
         <div class="wx-search">
           <input id="wx-city" type="search" placeholder="Enter a city…" autocomplete="off" enterkeyhint="search" />
@@ -1201,18 +1216,21 @@
       if (tWrap) tWrap.setAttribute('aria-label', 'Temperature unavailable');
     }
     document.getElementById('wx-cond').textContent = codeLabel(code);
+    var units = getWebUnits();
+    var deg = units === 'metric' ? '°C' : '°F';
+    var windU = units === 'metric' ? 'km/h' : 'mph';
     document.getElementById('wx-feels').textContent =
-      c.apparent_temperature != null ? 'Feels ' + Math.round(c.apparent_temperature) + '°F' : 'Feels —';
+      c.apparent_temperature != null ? 'Feels ' + Math.round(c.apparent_temperature) + deg : 'Feels —';
     document.getElementById('wx-wind').textContent =
       c.wind_speed_10m != null
-        ? Math.round(c.wind_speed_10m) + ' mph ' + windDir(c.wind_direction_10m)
+        ? Math.round(c.wind_speed_10m) + ' ' + windU + ' ' + windDir(c.wind_direction_10m)
         : '—';
     document.getElementById('wx-hum').textContent =
       c.relative_humidity_2m != null ? c.relative_humidity_2m + '%' : '—';
     var dewEl = document.getElementById('wx-dew');
     if (dewEl) {
       dewEl.textContent =
-        c.dew_point_2m != null ? Math.round(c.dew_point_2m) + '°F' : '—';
+        c.dew_point_2m != null ? Math.round(c.dew_point_2m) + deg : '—';
     }
     document.getElementById('wx-uv').textContent =
       c.uv_index != null ? String(Math.round(c.uv_index)) : '—';
@@ -1226,15 +1244,65 @@
     applyMood(next);
     renderDaily(loc, data);
   }
+
+  function defaultWebUnits() {
+    try {
+      var lang = String(navigator.language || navigator.userLanguage || '').toLowerCase();
+      // US stays Fahrenheit; Australia / rest of world → Celsius
+      if (lang === 'en-us' || lang.indexOf('en-us') === 0) return 'imperial';
+      return 'metric';
+    } catch (_) { return 'imperial'; }
+  }
+  function getWebUnits() {
+    try {
+      var u = localStorage.getItem('gw_web_units');
+      if (u === 'metric' || u === 'imperial') return u;
+    } catch (_) {}
+    return defaultWebUnits();
+  }
+  function setWebUnits(u) {
+    if (u !== 'metric' && u !== 'imperial') u = 'imperial';
+    try { localStorage.setItem('gw_web_units', u); } catch (_) {}
+    syncUnitsButtons();
+  }
+  function syncUnitsButtons() {
+    var u = getWebUnits();
+    var bf = document.getElementById('wx-units-f');
+    var bc = document.getElementById('wx-units-c');
+    if (bf) bf.classList.toggle('active', u === 'imperial');
+    if (bc) bc.classList.toggle('active', u === 'metric');
+  }
+  function wireUnitsToggle() {
+    syncUnitsButtons();
+    ['wx-units-f', 'wx-units-c'].forEach(function (id) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var next = btn.getAttribute('data-units');
+        if (next === getWebUnits()) return;
+        setWebUnits(next);
+        // Reload current place with new units
+        try {
+          var saved = JSON.parse(localStorage.getItem('gw_web_loc') || 'null');
+          if (saved && saved.lat != null) {
+            loadAt(saved.lat, saved.lon, saved.label || null, {});
+          }
+        } catch (_) {}
+        loadTicker();
+      });
+    });
+  }
+
   async function fetchWeather(lat, lon) {
+    var units = getWebUnits();
     var params = new URLSearchParams({
       latitude: String(lat),
       longitude: String(lon),
       current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,uv_index,is_day,visibility',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max',
-      temperature_unit: 'fahrenheit',
-      wind_speed_unit: 'mph',
-      precipitation_unit: 'inch',
+      temperature_unit: units === 'metric' ? 'celsius' : 'fahrenheit',
+      wind_speed_unit: units === 'metric' ? 'kmh' : 'mph',
+      precipitation_unit: units === 'metric' ? 'mm' : 'inch',
       timezone: 'auto',
       forecast_days: '10',
     });
@@ -1496,7 +1564,7 @@
       latitude: lats,
       longitude: lons,
       current: 'temperature_2m,weather_code',
-      temperature_unit: 'fahrenheit',
+      temperature_unit: getWebUnits() === 'metric' ? 'celsius' : 'fahrenheit',
       timezone: 'auto',
     });
     var res = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
@@ -1757,6 +1825,7 @@
     setInterval(function () {
       if (mood === 'rain' && Math.random() < 0.12) flashLightning();
     }, 4000);
+    wireUnitsToggle();
     bootWeather();
     loadTicker();
     // Refresh ticker temps every 20 minutes

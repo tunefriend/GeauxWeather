@@ -58,33 +58,65 @@ def load_config() -> dict:
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             pass
+    units = "fahrenheit"
+    lang = (os.environ.get("LANG") or "") + (os.environ.get("LC_ALL") or "")
+    # Fresh installs outside en_US default to Celsius (e.g. Australia)
+    if "en_US" not in lang:
+        units = "celsius"
     return {
         "lat": DEFAULT_LAT,
         "lon": DEFAULT_LON,
         "label": DEFAULT_LABEL,
-        "units": "fahrenheit",
+        "units": units,
     }
 
 
+def save_config(cfg: dict) -> None:
+    path = config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 
 
-def render_temp_icon(temp_text: str, out_path: Path) -> str:
-    """Draw temperature as text only on a fully transparent icon (no box fill).
 
-    GNOME/AppIndicator always shows an icon slot. A blank icon becomes a black
-    square; baking the temp into the icon (with no set_label) shows a single
-    clean temperature in the top bar.
-    """
+
+def draw_condition_mark(draw, code, box) -> None:
+    """Simple drawn weather mark for the tray (no emoji font required)."""
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    r = min(x1 - x0, y1 - y0) * 0.32
+    c = int(code) if code is not None else -1
+    if c == 0:
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 196, 72, 255))
+    elif c in (1, 2):
+        draw.ellipse((cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35), fill=(255, 196, 72, 255))
+        draw.ellipse((cx - r * 0.2, cy - r * 0.15, cx + r * 1.05, cy + r * 0.85), fill=(210, 220, 235, 230))
+    elif 51 <= c <= 67 or 80 <= c <= 82 or c >= 95:
+        draw.ellipse((cx - r * 0.95, cy - r * 0.85, cx + r * 0.95, cy + r * 0.35), fill=(170, 185, 205, 240))
+        for dx in (-6, 0, 6):
+            draw.line((cx + dx, cy + 4, cx + dx - 2, cy + 12), fill=(120, 170, 255, 255), width=2)
+        if c >= 95:
+            draw.polygon([(cx + 2, cy - 2), (cx - 4, cy + 6), (cx + 1, cy + 6), (cx - 3, cy + 14)], fill=(255, 220, 80, 255))
+    elif 71 <= c <= 77:
+        draw.ellipse((cx - r, cy - r * 0.7, cx + r, cy + r * 0.4), fill=(220, 230, 245, 240))
+        for dx, dy in ((-5, 6), (0, 8), (5, 6)):
+            draw.line((cx + dx - 2, cy + dy, cx + dx + 2, cy + dy), fill=(230, 240, 255, 255), width=2)
+            draw.line((cx + dx, cy + dy - 2, cx + dx, cy + dy + 2), fill=(230, 240, 255, 255), width=2)
+    else:
+        draw.ellipse((cx - r * 1.05, cy - r * 0.55, cx + r * 1.05, cy + r * 0.7), fill=(190, 200, 215, 235))
+
+
+def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
+    """Draw condition mark + temperature on a transparent panel icon."""
     from PIL import Image, ImageDraw, ImageFont
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Wide enough for "100°"; tall enough for panel scaling
-    w, h = 72, 36
+    w, h = 96, 36
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
+    draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
 
     text = (temp_text or "—").strip()[:4]
-    fs = 26 if len(text) <= 3 else 22
+    fs = 24 if len(text) <= 3 else 20
     font = None
     for fp in (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -102,18 +134,39 @@ def render_temp_icon(temp_text: str, out_path: Path) -> str:
 
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = (w - tw) / 2 - bbox[0]
+    x = 38 + max(0, (w - 40 - tw) / 2) - bbox[0]
     y = (h - th) / 2 - bbox[1]
-    # Soft shadow for contrast on light and dark panels
     draw.text((x + 1, y + 1), text, font=font, fill=(0, 0, 0, 160))
     draw.text((x, y), text, font=font, fill=(245, 248, 255, 255))
     img.save(out_path, "PNG")
     return str(out_path)
 
 
-def find_icon() -> str:
+def render_temp_icon(temp_text: str, out_path: Path) -> str:
+    """Back-compat wrapper (temp only)."""
+    return render_tray_icon(temp_text, None, out_path)
+
+
+def find_icon(code=None) -> str:
     """Theme fallback if Pillow is missing."""
+    try:
+        c = int(code) if code is not None else -1
+    except (TypeError, ValueError):
+        c = -1
+    if c == 0:
+        return "weather-clear"
+    if c in (1, 2):
+        return "weather-few-clouds"
+    if c == 3:
+        return "weather-overcast"
+    if 51 <= c <= 67 or 80 <= c <= 82:
+        return "weather-showers"
+    if 71 <= c <= 77:
+        return "weather-snow"
+    if c >= 95:
+        return "weather-storm"
     return "weather-few-clouds"
+
 
 
 def http_get_json(url: str, timeout: float = 12.0) -> dict:
@@ -192,6 +245,7 @@ class WeatherModel:
         self.cfg = load_config()
         self.summary = "Loading…"
         self.short = "GW"
+        self.code = None
         self.listeners: list = []
 
     def on_change(self, cb) -> None:
@@ -215,15 +269,23 @@ class WeatherModel:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def set_units(self, units: str) -> None:
+        units = "celsius" if units == "celsius" else "fahrenheit"
+        self.cfg["units"] = units
+        save_config(self.cfg)
+        self.refresh()
+
     def _apply(self, wx, err) -> bool:
         label = str(self.cfg.get("label") or DEFAULT_LABEL)
         units = unit_suffix(str(self.cfg.get("units", "fahrenheit")))
         if err or not wx:
             self.short = "GW"
+            self.code = None
             self.summary = "Weather unavailable — open site"
         else:
             temp = wx.get("temp")
-            cond = code_label(wx.get("code"))
+            self.code = wx.get("code")
+            cond = code_label(self.code)
             if temp is None:
                 self.short = "GW"
                 self.summary = f"{label} · {cond}"
@@ -280,6 +342,17 @@ class IndicatorUI:
         refresh.connect("activate", lambda *_: model.refresh())
         self.menu.append(refresh)
 
+        units_menu = Gtk.Menu()
+        item_c = Gtk.MenuItem(label="Celsius (°C)")
+        item_c.connect("activate", lambda *_: model.set_units("celsius"))
+        units_menu.append(item_c)
+        item_f = Gtk.MenuItem(label="Fahrenheit (°F)")
+        item_f.connect("activate", lambda *_: model.set_units("fahrenheit"))
+        units_menu.append(item_f)
+        units_root = Gtk.MenuItem(label="Units")
+        units_root.set_submenu(units_menu)
+        self.menu.append(units_root)
+
         self.menu.append(Gtk.SeparatorMenuItem())
         quit_item = Gtk.MenuItem(label="Quit")
         quit_item.connect("activate", lambda *_: request_quit())
@@ -299,8 +372,8 @@ class IndicatorUI:
         try:
             # Unique filename so the panel reloads the image when temp changes
             safe = "".join(ch if ch.isalnum() or ch in ".-" else "_" for ch in self.model.short)
-            path = self._icon_dir / f"tray-{safe}.png"
-            rendered = render_temp_icon(self.model.short, path)
+            path = self._icon_dir / f"tray-{safe}-{self.model.code}.png"
+            rendered = render_tray_icon(self.model.short, self.model.code, path)
             self.indicator.set_icon_full(rendered, self.model.summary or "GeauxWeather")
             # Drop any leftover label from older builds
             try:
@@ -309,7 +382,7 @@ class IndicatorUI:
                 pass
         except Exception:
             try:
-                self.indicator.set_icon(find_icon())
+                self.indicator.set_icon(find_icon(self.model.code))
             except Exception:
                 pass
         self.indicator.set_title(self.model.summary)
