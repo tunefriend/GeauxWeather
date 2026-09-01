@@ -79,62 +79,172 @@ def save_config(cfg: dict) -> None:
 
 
 
+def condition_emoji(code) -> str:
+    """Map WMO weather_code → emoji (includes Overcast=3 → ☁)."""
+    try:
+        c = int(code) if code is not None else -1
+    except (TypeError, ValueError):
+        c = -1
+    if c == 0:
+        return "☀"
+    if c == 1:
+        return "🌤"
+    if c == 2:
+        return "⛅"
+    if c == 3:
+        return "☁"  # Overcast — must not fall back to sun
+    if 45 <= c <= 48:
+        return "🌫"
+    if 51 <= c <= 67 or 80 <= c <= 82:
+        return "🌧"
+    if 71 <= c <= 77:
+        return "❄"
+    if c >= 95:
+        return "⛈"
+    return "☁"
+
+
 def draw_condition_mark(draw, code, box) -> None:
-    """Simple drawn weather mark for the tray (no emoji font required)."""
+    """Drawn weather mark when emoji fonts are unavailable."""
     x0, y0, x1, y1 = box
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     r = min(x1 - x0, y1 - y0) * 0.32
-    c = int(code) if code is not None else -1
+    try:
+        c = int(code) if code is not None else -1
+    except (TypeError, ValueError):
+        c = -1
     if c == 0:
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 196, 72, 255))
     elif c in (1, 2):
-        draw.ellipse((cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35), fill=(255, 196, 72, 255))
-        draw.ellipse((cx - r * 0.2, cy - r * 0.15, cx + r * 1.05, cy + r * 0.85), fill=(210, 220, 235, 230))
+        draw.ellipse(
+            (cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35),
+            fill=(255, 196, 72, 255),
+        )
+        draw.ellipse(
+            (cx - r * 0.2, cy - r * 0.15, cx + r * 1.05, cy + r * 0.85),
+            fill=(210, 220, 235, 230),
+        )
+    elif c == 3 or c < 0:
+        # Overcast / unknown → full cloud (never sun)
+        draw.ellipse(
+            (cx - r * 1.05, cy - r * 0.55, cx + r * 1.05, cy + r * 0.7),
+            fill=(190, 200, 215, 235),
+        )
+    elif 45 <= c <= 48:
+        draw.ellipse(
+            (cx - r * 1.0, cy - r * 0.4, cx + r * 1.0, cy + r * 0.55),
+            fill=(180, 190, 200, 180),
+        )
     elif 51 <= c <= 67 or 80 <= c <= 82 or c >= 95:
-        draw.ellipse((cx - r * 0.95, cy - r * 0.85, cx + r * 0.95, cy + r * 0.35), fill=(170, 185, 205, 240))
+        draw.ellipse(
+            (cx - r * 0.95, cy - r * 0.85, cx + r * 0.95, cy + r * 0.35),
+            fill=(170, 185, 205, 240),
+        )
         for dx in (-6, 0, 6):
-            draw.line((cx + dx, cy + 4, cx + dx - 2, cy + 12), fill=(120, 170, 255, 255), width=2)
+            draw.line(
+                (cx + dx, cy + 4, cx + dx - 2, cy + 12),
+                fill=(120, 170, 255, 255),
+                width=2,
+            )
         if c >= 95:
-            draw.polygon([(cx + 2, cy - 2), (cx - 4, cy + 6), (cx + 1, cy + 6), (cx - 3, cy + 14)], fill=(255, 220, 80, 255))
+            draw.polygon(
+                [
+                    (cx + 2, cy - 2),
+                    (cx - 4, cy + 6),
+                    (cx + 1, cy + 6),
+                    (cx - 3, cy + 14),
+                ],
+                fill=(255, 220, 80, 255),
+            )
     elif 71 <= c <= 77:
-        draw.ellipse((cx - r, cy - r * 0.7, cx + r, cy + r * 0.4), fill=(220, 230, 245, 240))
+        draw.ellipse(
+            (cx - r, cy - r * 0.7, cx + r, cy + r * 0.4),
+            fill=(220, 230, 245, 240),
+        )
         for dx, dy in ((-5, 6), (0, 8), (5, 6)):
-            draw.line((cx + dx - 2, cy + dy, cx + dx + 2, cy + dy), fill=(230, 240, 255, 255), width=2)
-            draw.line((cx + dx, cy + dy - 2, cx + dx, cy + dy + 2), fill=(230, 240, 255, 255), width=2)
+            draw.line(
+                (cx + dx - 2, cy + dy, cx + dx + 2, cy + dy),
+                fill=(230, 240, 255, 255),
+                width=2,
+            )
+            draw.line(
+                (cx + dx, cy + dy - 2, cx + dx, cy + dy + 2),
+                fill=(230, 240, 255, 255),
+                width=2,
+            )
     else:
-        draw.ellipse((cx - r * 1.05, cy - r * 0.55, cx + r * 1.05, cy + r * 0.7), fill=(190, 200, 215, 235))
+        draw.ellipse(
+            (cx - r * 1.05, cy - r * 0.55, cx + r * 1.05, cy + r * 0.7),
+            fill=(190, 200, 215, 235),
+        )
+
+
+def _load_font(size: int, emoji: bool = False):
+    from PIL import ImageFont
+
+    candidates = []
+    if emoji:
+        candidates = [
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf",
+            "/usr/share/fonts/opentype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+    else:
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        ]
+    for fp in candidates:
+        if Path(fp).is_file():
+            try:
+                return ImageFont.truetype(fp, size)
+            except OSError:
+                continue
+    return ImageFont.load_default()
 
 
 def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
-    """Draw condition mark + temperature on a transparent panel icon."""
-    from PIL import Image, ImageDraw, ImageFont
+    """Draw condition (emoji preferred) + temperature on a transparent panel icon."""
+    from PIL import Image, ImageDraw
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    w, h = 96, 36
+    w, h = 100, 36
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
+
+    glyph = condition_emoji(weather_code)
+    used_emoji = False
+    # Prefer emoji glyphs (Mint/Cinnamon + fonts-noto-color-emoji) — clearer than shapes
+    for size in (20, 22, 18, 109):
+        try:
+            emoji_font = _load_font(size, emoji=True)
+            eb = draw.textbbox((0, 0), glyph, font=emoji_font)
+            ew, eh = eb[2] - eb[0], eb[3] - eb[1]
+            if ew < 8 or eh < 8:
+                continue
+            ex = 6 - eb[0]
+            ey = (h - eh) / 2 - eb[1]
+            try:
+                draw.text((ex, ey), glyph, font=emoji_font, embedded_color=True)
+            except TypeError:
+                draw.text((ex, ey), glyph, font=emoji_font, fill=(235, 240, 250, 255))
+            used_emoji = True
+            break
+        except Exception:
+            continue
+
+    if not used_emoji:
+        draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
 
     text = (temp_text or "—").strip()[:4]
     fs = 24 if len(text) <= 3 else 20
-    font = None
-    for fp in (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    ):
-        if Path(fp).is_file():
-            try:
-                font = ImageFont.truetype(fp, fs)
-                break
-            except OSError:
-                pass
-    if font is None:
-        font = ImageFont.load_default()
-
+    font = _load_font(fs, emoji=False)
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = 38 + max(0, (w - 40 - tw) / 2) - bbox[0]
+    x = 40 + max(0, (w - 44 - tw) / 2) - bbox[0]
     y = (h - th) / 2 - bbox[1]
     draw.text((x + 1, y + 1), text, font=font, fill=(0, 0, 0, 160))
     draw.text((x, y), text, font=font, fill=(245, 248, 255, 255))

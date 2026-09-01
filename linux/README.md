@@ -77,3 +77,14 @@ bash uninstall.sh --purge
 ```
 
 Weather: [Open-Meteo](https://open-meteo.com/) (no API key).
+
+## Update / reinstall
+
+```bash
+curl -fsSL https://geauxweather.com/linux/install.sh | bash
+# restart tray (quit from tray menu, or):
+killall geauxweather_tray.py 2>/dev/null || true
+python3 ~/.local/share/geauxweather-widget/geauxweather_tray.py &
+```
+
+The installer works when piped from curl (no need to copy files into your home directory first).
