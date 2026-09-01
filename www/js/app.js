@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.15';
+  const APP_VERSION = '1.0.16';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -455,10 +455,31 @@
         value: c.pressure_msl != null ? Math.round(c.pressure_msl) + ' hPa' : '—',
       },
     ];
+
+    // Air Quality Index (Open-Meteo CAMS) — US AQI for imperial, European AQI for metric
+    const aq = data.air_quality;
+    if (aq) {
+      const useUs = units !== 'metric';
+      const aqiVal = useUs ? aq.us_aqi : aq.european_aqi;
+      const band = useUs ? W.usAqiLabel(aqiVal) : W.euAqiLabel(aqiVal);
+      metrics.splice(3, 0, {
+        label: useUs ? 'AQI (US)' : 'AQI (EU)',
+        value:
+          aqiVal != null
+            ? Math.round(aqiVal) + (band.text !== '—' ? ' · ' + band.text : '')
+            : '—',
+        aqiKey: band.key,
+      });
+    } else {
+      metrics.splice(3, 0, { label: 'AQI', value: '—', aqiKey: 'unknown' });
+    }
+
     document.getElementById('metrics-today').innerHTML = metrics
       .map(function (m) {
         return (
-          '<div class="metric"><div class="metric-label">' +
+          '<div class="metric' +
+          (m.aqiKey ? ' aqi-' + m.aqiKey : '') +
+          '"><div class="metric-label">' +
           m.label +
           '</div><div class="metric-value">' +
           m.value +

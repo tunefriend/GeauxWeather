@@ -22,6 +22,43 @@
  */
 (function (global) {
   const BASE = 'https://api.open-meteo.com/v1/forecast';
+  const AQ_BASE = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+
+  /** US EPA AQI bands */
+  function usAqiLabel(aqi) {
+    const n = Number(aqi);
+    if (isNaN(n)) return { text: '—', key: 'unknown' };
+    if (n <= 50) return { text: 'Good', key: 'good' };
+    if (n <= 100) return { text: 'Moderate', key: 'moderate' };
+    if (n <= 150) return { text: 'Unhealthy (sensitive)', key: 'usg' };
+    if (n <= 200) return { text: 'Unhealthy', key: 'unhealthy' };
+    if (n <= 300) return { text: 'Very unhealthy', key: 'very' };
+    return { text: 'Hazardous', key: 'hazardous' };
+  }
+
+  /** European AQI bands (EEA) */
+  function euAqiLabel(aqi) {
+    const n = Number(aqi);
+    if (isNaN(n)) return { text: '—', key: 'unknown' };
+    if (n <= 20) return { text: 'Good', key: 'good' };
+    if (n <= 40) return { text: 'Fair', key: 'good' };
+    if (n <= 60) return { text: 'Moderate', key: 'moderate' };
+    if (n <= 80) return { text: 'Poor', key: 'usg' };
+    if (n <= 100) return { text: 'Very poor', key: 'unhealthy' };
+    return { text: 'Extremely poor', key: 'hazardous' };
+  }
+
+  async function fetchAirQuality(lat, lon) {
+    const params = new URLSearchParams({
+      latitude: lat,
+      longitude: lon,
+      current: 'us_aqi,european_aqi,pm2_5,pm10',
+      timezone: 'auto',
+    });
+    const res = await fetch(AQ_BASE + '?' + params);
+    if (!res.ok) throw new Error('Open-Meteo AQ ' + res.status);
+    return res.json();
+  }
 
   async function fetchForecast(lat, lon, units) {
     units = units || 'imperial';
@@ -81,7 +118,15 @@
 
     const res = await fetch(BASE + '?' + params);
     if (!res.ok) throw new Error('Open-Meteo ' + res.status);
-    return res.json();
+    const data = await res.json();
+    // Attach air quality (best-effort; don't fail the whole forecast)
+    try {
+      const aq = await fetchAirQuality(lat, lon);
+      data.air_quality = aq.current || null;
+    } catch (e) {
+      data.air_quality = null;
+    }
+    return data;
   }
 
   function codeToCondition(code) {
@@ -143,6 +188,9 @@
 
   global.PureSkyWeather = {
     fetchForecast: fetchForecast,
+    fetchAirQuality: fetchAirQuality,
+    usAqiLabel: usAqiLabel,
+    euAqiLabel: euAqiLabel,
     codeToCondition: codeToCondition,
     codeToMood: codeToMood,
     windDir: windDir,

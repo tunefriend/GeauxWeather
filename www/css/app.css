@@ -1289,6 +1289,13 @@ button.setting-btn:active {
   color: var(--text-muted);
   opacity: 0.5;
 }
+.metric.aqi-good .metric-value { color: #3dcc8c; }
+.metric.aqi-moderate .metric-value { color: #f0c14a; }
+.metric.aqi-usg .metric-value { color: #f0a040; }
+.metric.aqi-unhealthy .metric-value { color: #e85d4c; }
+.metric.aqi-very .metric-value { color: #c44dff; }
+.metric.aqi-hazardous .metric-value { color: #a02040; }
+
 .hour-wind {
   font-size: 0.68rem;
   color: var(--text-muted);
