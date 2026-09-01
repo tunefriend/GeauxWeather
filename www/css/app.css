@@ -1223,6 +1223,59 @@ button.setting-btn:active {
   color: #e85d4c;
 }
 
+/* Next-hour rain (WeatherBug-style minute graph from 15-min model steps) */
+.next-hour {
+  margin: 4px 0 14px;
+  padding: 12px 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.next-hour.hidden { display: none; }
+.next-hour-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.next-hour-title {
+  margin: 0 !important;
+  font-size: 0.95rem !important;
+}
+.next-hour-summary {
+  white-space: nowrap;
+}
+.next-hour-graph {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 56px;
+  padding: 0 2px;
+}
+.next-hour-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+  background: rgba(120, 140, 160, 0.35);
+}
+.next-hour-bar.is-chance {
+  background: rgba(94, 164, 240, 0.55);
+}
+.next-hour-bar.is-wet {
+  background: rgba(61, 139, 253, 0.9);
+}
+.next-hour-bar.is-heavy {
+  background: rgba(232, 93, 76, 0.92);
+}
+.next-hour-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
 /* --- Polish: hourly precip + expandable daily --- */
 .hour-pop {
   font-size: 0.7rem;

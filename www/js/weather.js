@@ -65,6 +65,13 @@
         'wind_speed_10m_max',
         'wind_direction_10m_dominant',
       ].join(','),
+      // Next-hour rain graph (WeatherBug-style): 15-min steps for ~2h
+      minutely_15: [
+        'precipitation',
+        'precipitation_probability',
+        'weather_code',
+      ].join(','),
+      forecast_minutely_15: 8,
       temperature_unit: tempUnit,
       wind_speed_unit: windUnit,
       precipitation_unit: precipUnit,

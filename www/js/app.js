@@ -24,7 +24,7 @@
   const L = window.PureSkyLocation;
   const W = window.PureSkyWeather;
   /** Keep in sync with android/app/build.gradle versionName */
-  const APP_VERSION = '1.0.14';
+  const APP_VERSION = '1.0.15';
 
   const screens = {
     today: document.getElementById('screen-today'),
@@ -468,6 +468,101 @@
       .join('');
   }
 
+  function renderNextHour(data) {
+    const wrap = document.getElementById('next-hour');
+    const graph = document.getElementById('next-hour-graph');
+    const summary = document.getElementById('next-hour-summary');
+    if (!wrap || !graph) return;
+
+    const m = data.minutely_15;
+    if (!m || !m.time || !m.time.length) {
+      wrap.classList.add('hidden');
+      return;
+    }
+    wrap.classList.remove('hidden');
+
+    const now = Date.now();
+    // Take up to 4×15min (= 60m) starting at/near now
+    let start = 0;
+    for (let i = 0; i < m.time.length; i++) {
+      if (new Date(m.time[i]).getTime() >= now - 10 * 60 * 1000) {
+        start = i;
+        break;
+      }
+    }
+    const slots = [];
+    for (let i = start; i < Math.min(start + 4, m.time.length); i++) {
+      const prob =
+        m.precipitation_probability && m.precipitation_probability[i] != null
+          ? Number(m.precipitation_probability[i])
+          : 0;
+      const precip =
+        m.precipitation && m.precipitation[i] != null
+          ? Number(m.precipitation[i])
+          : 0;
+      slots.push({
+        t: m.time[i],
+        prob: isNaN(prob) ? 0 : Math.max(0, Math.min(100, prob)),
+        precip: isNaN(precip) ? 0 : precip,
+      });
+    }
+    if (!slots.length) {
+      wrap.classList.add('hidden');
+      return;
+    }
+
+    // Expand each 15-min slot into 15 visual “minute” bars (WeatherBug-style)
+    let html = '';
+    let peak = 0;
+    let anyWet = false;
+    for (let s = 0; s < slots.length; s++) {
+      const slot = slots[s];
+      if (slot.prob > peak) peak = slot.prob;
+      if (slot.prob >= 20 || slot.precip > 0) anyWet = true;
+      for (let k = 0; k < 15; k++) {
+        const hPct = Math.max(4, Math.round(slot.prob));
+        let cls = 'next-hour-bar';
+        if (slot.prob >= 70 || slot.precip >= (units === 'metric' ? 1 : 0.04)) {
+          cls += ' is-heavy';
+        } else if (slot.prob >= 30 || slot.precip > 0) {
+          cls += ' is-wet';
+        } else if (slot.prob >= 10) {
+          cls += ' is-chance';
+        }
+        const tip =
+          '+' +
+          (s * 15 + k) +
+          'm · ' +
+          Math.round(slot.prob) +
+          '% chance' +
+          (slot.precip > 0
+            ? ' · ' +
+              slot.precip.toFixed(units === 'metric' ? 1 : 2) +
+              (units === 'metric' ? ' mm' : ' in')
+            : '');
+        html +=
+          '<div class="' +
+          cls +
+          '" style="height:' +
+          hPct +
+          '%" title="' +
+          tip.replace(/"/g, '&quot;') +
+          '"></div>';
+      }
+    }
+    graph.innerHTML = html;
+
+    if (summary) {
+      if (!anyWet && peak < 15) {
+        summary.textContent = 'Dry next hour';
+      } else if (peak >= 70) {
+        summary.textContent = 'Likely rain · up to ' + Math.round(peak) + '%';
+      } else {
+        summary.textContent = 'Chance up to ' + Math.round(peak) + '%';
+      }
+    }
+  }
+
   function renderHourly(data) {
     const h = data.hourly;
     const now = Date.now();
@@ -641,6 +736,7 @@
 
   function renderAll(data) {
     renderCurrent(data);
+    renderNextHour(data);
     renderHourly(data);
     renderDaily(data);
   }
