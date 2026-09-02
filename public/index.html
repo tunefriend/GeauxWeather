@@ -1601,11 +1601,134 @@
     { name: 'Los Angeles, CA', lat: 34.05, lon: -118.24 },
     { name: 'San Diego, CA', lat: 32.72, lon: -117.16 },
     { name: 'Sacramento, CA', lat: 38.58, lon: -121.49 },
-    // Border neighbors only when close
+    // Canada / Mexico
     { name: 'Toronto, ON', lat: 43.65, lon: -79.38 },
+    { name: 'Ottawa, ON', lat: 45.42, lon: -75.70 },
     { name: 'Montreal, QC', lat: 45.50, lon: -73.57 },
+    { name: 'Quebec City, QC', lat: 46.81, lon: -71.21 },
+    { name: 'Winnipeg, MB', lat: 49.90, lon: -97.14 },
+    { name: 'Calgary, AB', lat: 51.05, lon: -114.07 },
+    { name: 'Edmonton, AB', lat: 53.55, lon: -113.49 },
     { name: 'Vancouver, BC', lat: 49.28, lon: -123.12 },
+    { name: 'Victoria, BC', lat: 48.43, lon: -123.37 },
+    { name: 'Mexico City, MX', lat: 19.43, lon: -99.13 },
+    { name: 'Guadalajara, MX', lat: 20.67, lon: -103.35 },
     { name: 'Monterrey, MX', lat: 25.69, lon: -100.32 },
+    { name: 'Tijuana, MX', lat: 32.51, lon: -117.04 },
+    // Australia / New Zealand (Nearby must work for AU users)
+    { name: 'Sydney, AU', lat: -33.87, lon: 151.21 },
+    { name: 'Melbourne, AU', lat: -37.81, lon: 144.96 },
+    { name: 'Brisbane, AU', lat: -27.47, lon: 153.03 },
+    { name: 'Perth, AU', lat: -31.95, lon: 115.86 },
+    { name: 'Adelaide, AU', lat: -34.93, lon: 138.60 },
+    { name: 'Canberra, AU', lat: -35.28, lon: 149.13 },
+    { name: 'Gold Coast, AU', lat: -28.02, lon: 153.40 },
+    { name: 'Newcastle, AU', lat: -32.93, lon: 151.78 },
+    { name: 'Wollongong, AU', lat: -34.43, lon: 150.89 },
+    { name: 'Hobart, AU', lat: -42.88, lon: 147.33 },
+    { name: 'Geelong, AU', lat: -38.15, lon: 144.36 },
+    { name: 'Townsville, AU', lat: -19.26, lon: 146.82 },
+    { name: 'Cairns, AU', lat: -16.92, lon: 145.78 },
+    { name: 'Darwin, AU', lat: -12.46, lon: 130.84 },
+    { name: 'Bunbury, AU', lat: -33.33, lon: 115.64 },
+    { name: 'Auckland, NZ', lat: -36.85, lon: 174.76 },
+    { name: 'Wellington, NZ', lat: -41.29, lon: 174.78 },
+    { name: 'Christchurch, NZ', lat: -43.53, lon: 172.64 },
+    { name: 'Hamilton, NZ', lat: -37.79, lon: 175.28 },
+    { name: 'Dunedin, NZ', lat: -45.88, lon: 170.50 },
+    // UK / Ireland
+    { name: 'London, UK', lat: 51.51, lon: -0.13 },
+    { name: 'Birmingham, UK', lat: 52.49, lon: -1.90 },
+    { name: 'Manchester, UK', lat: 53.48, lon: -2.24 },
+    { name: 'Edinburgh, UK', lat: 55.95, lon: -3.19 },
+    { name: 'Glasgow, UK', lat: 55.86, lon: -4.25 },
+    { name: 'Cardiff, UK', lat: 51.48, lon: -3.18 },
+    { name: 'Belfast, UK', lat: 54.60, lon: -5.93 },
+    { name: 'Dublin, IE', lat: 53.35, lon: -6.26 },
+    { name: 'Cork, IE', lat: 51.90, lon: -8.47 },
+    // Western / Central Europe
+    { name: 'Paris, FR', lat: 48.86, lon: 2.35 },
+    { name: 'Lyon, FR', lat: 45.76, lon: 4.84 },
+    { name: 'Marseille, FR', lat: 43.30, lon: 5.37 },
+    { name: 'Brussels, BE', lat: 50.85, lon: 4.35 },
+    { name: 'Amsterdam, NL', lat: 52.37, lon: 4.90 },
+    { name: 'Rotterdam, NL', lat: 51.92, lon: 4.48 },
+    { name: 'Berlin, DE', lat: 52.52, lon: 13.41 },
+    { name: 'Hamburg, DE', lat: 53.55, lon: 9.99 },
+    { name: 'Munich, DE', lat: 48.14, lon: 11.58 },
+    { name: 'Frankfurt, DE', lat: 50.11, lon: 8.68 },
+    { name: 'Cologne, DE', lat: 50.94, lon: 6.96 },
+    { name: 'Zurich, CH', lat: 47.38, lon: 8.54 },
+    { name: 'Geneva, CH', lat: 46.20, lon: 6.14 },
+    { name: 'Vienna, AT', lat: 48.21, lon: 16.37 },
+    { name: 'Prague, CZ', lat: 50.08, lon: 14.44 },
+    { name: 'Warsaw, PL', lat: 52.23, lon: 21.01 },
+    { name: 'Budapest, HU', lat: 47.50, lon: 19.04 },
+    // Southern Europe
+    { name: 'Madrid, ES', lat: 40.42, lon: -3.70 },
+    { name: 'Barcelona, ES', lat: 41.39, lon: 2.17 },
+    { name: 'Lisbon, PT', lat: 38.72, lon: -9.14 },
+    { name: 'Rome, IT', lat: 41.90, lon: 12.50 },
+    { name: 'Milan, IT', lat: 45.46, lon: 9.19 },
+    { name: 'Naples, IT', lat: 40.85, lon: 14.27 },
+    { name: 'Athens, GR', lat: 37.98, lon: 23.73 },
+    { name: 'Istanbul, TR', lat: 41.01, lon: 28.98 },
+    { name: 'Ankara, TR', lat: 39.93, lon: 32.86 },
+    // Nordics / Eastern Europe / Russia
+    { name: 'Copenhagen, DK', lat: 55.68, lon: 12.57 },
+    { name: 'Stockholm, SE', lat: 59.33, lon: 18.07 },
+    { name: 'Oslo, NO', lat: 59.91, lon: 10.75 },
+    { name: 'Helsinki, FI', lat: 60.17, lon: 24.94 },
+    { name: 'Moscow, RU', lat: 55.76, lon: 37.62 },
+    { name: 'St. Petersburg, RU', lat: 59.93, lon: 30.34 },
+    { name: 'Kyiv, UA', lat: 50.45, lon: 30.52 },
+    // Middle East / Africa
+    { name: 'Dubai, AE', lat: 25.20, lon: 55.27 },
+    { name: 'Abu Dhabi, AE', lat: 24.45, lon: 54.38 },
+    { name: 'Riyadh, SA', lat: 24.71, lon: 46.68 },
+    { name: 'Tel Aviv, IL', lat: 32.09, lon: 34.78 },
+    { name: 'Cairo, EG', lat: 30.04, lon: 31.24 },
+    { name: 'Alexandria, EG', lat: 31.20, lon: 29.92 },
+    { name: 'Lagos, NG', lat: 6.52, lon: 3.38 },
+    { name: 'Nairobi, KE', lat: -1.29, lon: 36.82 },
+    { name: 'Johannesburg, ZA', lat: -26.20, lon: 28.05 },
+    { name: 'Cape Town, ZA', lat: -33.92, lon: 18.42 },
+    { name: 'Durban, ZA', lat: -29.86, lon: 31.02 },
+    { name: 'Casablanca, MA', lat: 33.57, lon: -7.59 },
+    // South / East / SE Asia
+    { name: 'Mumbai, IN', lat: 19.08, lon: 72.88 },
+    { name: 'Delhi, IN', lat: 28.61, lon: 77.21 },
+    { name: 'Bengaluru, IN', lat: 12.97, lon: 77.59 },
+    { name: 'Chennai, IN', lat: 13.08, lon: 80.27 },
+    { name: 'Kolkata, IN', lat: 22.57, lon: 88.36 },
+    { name: 'Karachi, PK', lat: 24.86, lon: 67.00 },
+    { name: 'Bangkok, TH', lat: 13.76, lon: 100.50 },
+    { name: 'Singapore, SG', lat: 1.35, lon: 103.82 },
+    { name: 'Kuala Lumpur, MY', lat: 3.14, lon: 101.69 },
+    { name: 'Jakarta, ID', lat: -6.21, lon: 106.85 },
+    { name: 'Manila, PH', lat: 14.60, lon: 120.98 },
+    { name: 'Ho Chi Minh City, VN', lat: 10.82, lon: 106.63 },
+    { name: 'Hong Kong, HK', lat: 22.32, lon: 114.17 },
+    { name: 'Taipei, TW', lat: 25.03, lon: 121.57 },
+    { name: 'Shanghai, CN', lat: 31.23, lon: 121.47 },
+    { name: 'Beijing, CN', lat: 39.90, lon: 116.40 },
+    { name: 'Guangzhou, CN', lat: 23.13, lon: 113.26 },
+    { name: 'Tokyo, JP', lat: 35.68, lon: 139.69 },
+    { name: 'Osaka, JP', lat: 34.69, lon: 135.50 },
+    { name: 'Nagoya, JP', lat: 35.18, lon: 136.91 },
+    { name: 'Sapporo, JP', lat: 43.06, lon: 141.35 },
+    { name: 'Seoul, KR', lat: 37.57, lon: 126.98 },
+    { name: 'Busan, KR', lat: 35.18, lon: 129.08 },
+    // Latin America
+    { name: 'São Paulo, BR', lat: -23.55, lon: -46.63 },
+    { name: 'Rio de Janeiro, BR', lat: -22.91, lon: -43.17 },
+    { name: 'Brasília, BR', lat: -15.78, lon: -47.93 },
+    { name: 'Buenos Aires, AR', lat: -34.60, lon: -58.38 },
+    { name: 'Santiago, CL', lat: -33.45, lon: -70.67 },
+    { name: 'Lima, PE', lat: -12.05, lon: -77.04 },
+    { name: 'Bogotá, CO', lat: 4.71, lon: -74.07 },
+    { name: 'Medellín, CO', lat: 6.25, lon: -75.56 },
+    { name: 'Caracas, VE', lat: 10.48, lon: -66.90 },
   ];
   // Major world hubs for Worldwide ticker mode
   var TICKER_WORLD_CITIES = [
@@ -1630,8 +1753,9 @@
     { name: 'Sydney, AU', lat: -33.87, lon: 151.21 },
     { name: 'Auckland, NZ', lat: -36.85, lon: 174.76 },
   ];
-  var TICKER_NEAR_MI = 280; // primary radius (~neighboring metros)
-  var TICKER_WIDE_MI = 450; // expand if too few
+  var TICKER_NEAR_MI = 300; // primary radius (~neighboring metros)
+  var TICKER_WIDE_MI = 550; // expand if sparse (e.g. Sydney↔Brisbane)
+  var TICKER_HARD_MI = 700; // never show cities farther than this in Nearby
   var TICKER_MAX = 14;
   var tickerItems = []; // { name, lat, lon, temp, cond, isYou }
 
@@ -1675,8 +1799,8 @@
   }
 
   /**
-   * Pick nearby catalog cities for the ticker (not London/Tokyo/etc.).
-   * Uses your set location; falls back to a short regional list if none.
+   * Pick nearby catalog cities for the ticker by distance only.
+   * Never falls back to distant continents (AU must not see US cities).
    */
   function nearbyTickerCities(origin) {
     if (!origin || origin.lat == null || origin.lon == null) {
@@ -1701,10 +1825,10 @@
     if (near.length < 6) {
       near = scored.filter(function (c) { return c.mi <= TICKER_WIDE_MI; });
     }
-    // Still sparse (remote / international) — take closest N regardless
-    if (near.length < 4) {
-      near = scored.slice(0, TICKER_MAX);
+    if (near.length < 3) {
+      near = scored.filter(function (c) { return c.mi <= TICKER_HARD_MI; });
     }
+    // Hard cap: never invent “nearby” from another continent
     return near.slice(0, TICKER_MAX);
   }
 
@@ -1796,12 +1920,10 @@
     var cities = mode === 'worldwide' ? worldTickerCities() : nearbyTickerCities(saved);
 
     if (saved) {
-      // Avoid duplicating your city if it already appears in the worldwide list
-      if (mode === 'worldwide') {
-        cities = cities.filter(function (c) {
-          return milesBetween(saved.lat, saved.lon, c.lat, c.lon) > 18;
-        });
-      }
+      // Avoid duplicating your city if it already appears in the list
+      cities = cities.filter(function (c) {
+        return milesBetween(saved.lat, saved.lon, c.lat, c.lon) > 18;
+      });
       cities.unshift({
         name: shortCityName(saved.label),
         fullLabel: saved.label,
@@ -1819,7 +1941,9 @@
       wait.className = 'wx-ticker-item is-loading';
       wait.textContent = mode === 'worldwide'
         ? 'Loading worldwide temperatures…'
-        : 'Nearby temps appear after your location loads…';
+        : (saved
+          ? 'No cities nearby in range — open Nearby ▾ and try Worldwide'
+          : 'Nearby temps appear after your location loads…');
       track.appendChild(wait);
       return;
     }
