@@ -55,7 +55,7 @@
       position: relative;
       z-index: 2;
       width: 100%;
-      overflow: hidden;
+      overflow: visible; /* allow Nearby/Worldwide dropdown to escape */
       border-bottom: 1px solid var(--border);
       background: rgba(8, 14, 24, 0.72);
       backdrop-filter: blur(14px);
@@ -66,6 +66,12 @@
       display: flex;
       align-items: stretch;
       min-height: 44px;
+      overflow: visible;
+    }
+    .wx-ticker-mode {
+      position: relative;
+      flex: 0 0 auto;
+      z-index: 3;
     }
     .wx-ticker-label {
       flex: 0 0 auto;
@@ -73,21 +79,73 @@
       align-items: center;
       gap: 8px;
       padding: 0 14px;
+      min-height: 44px;
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: #9ec8f0;
       background: linear-gradient(90deg, rgba(61,139,253,0.28), rgba(61,139,253,0.08));
+      border: 0;
       border-right: 1px solid var(--border);
       white-space: nowrap;
+      font-family: inherit;
+      cursor: pointer;
       z-index: 1;
+    }
+    .wx-ticker-label:hover,
+    .wx-ticker-label[aria-expanded="true"] {
+      background: linear-gradient(90deg, rgba(61,139,253,0.4), rgba(61,139,253,0.14));
+      color: #c5e0ff;
     }
     .wx-ticker-label span.dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: #5eead4;
       box-shadow: 0 0 8px rgba(94,234,212,0.8);
       animation: tickerPulse 1.6s ease-in-out infinite;
+      flex: 0 0 auto;
+    }
+    .wx-ticker-caret {
+      font-size: 0.65rem;
+      opacity: 0.75;
+      margin-left: 2px;
+    }
+    .wx-ticker-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 8px;
+      min-width: 148px;
+      padding: 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(12, 18, 30, 0.96);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .wx-ticker-menu[hidden] { display: none; }
+    .wx-ticker-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .wx-ticker-menu button:hover,
+    .wx-ticker-menu button:focus-visible {
+      background: rgba(61,139,253,0.18);
+      outline: none;
+    }
+    .wx-ticker-menu button[aria-selected="true"] {
+      color: #5eead4;
+      background: rgba(94, 234, 212, 0.1);
     }
     @keyframes tickerPulse {
       0%, 100% { opacity: 0.55; }
@@ -653,7 +711,19 @@
   <!-- Scrolling temps (Weather Channel–style) — website only -->
   <div class="wx-ticker" aria-label="Temperatures around the country and world">
     <div class="wx-ticker-inner">
-      <div class="wx-ticker-label" title="Temperatures near your location"><span class="dot" aria-hidden="true"></span> Nearby</div>
+      <div class="wx-ticker-mode" id="wx-ticker-mode">
+        <button type="button" class="wx-ticker-label" id="wx-ticker-mode-btn"
+          aria-haspopup="listbox" aria-expanded="false" aria-controls="wx-ticker-menu"
+          title="Temperatures near your location — click to switch Nearby or Worldwide">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="wx-ticker-mode-text">Nearby</span>
+          <span class="wx-ticker-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="wx-ticker-menu" id="wx-ticker-menu" hidden role="listbox" aria-label="Ticker city list">
+          <button type="button" role="option" data-mode="nearby" aria-selected="true">Nearby</button>
+          <button type="button" role="option" data-mode="worldwide" aria-selected="false">Worldwide</button>
+        </div>
+      </div>
       <div class="wx-ticker-viewport">
         <div class="wx-ticker-track" id="wx-ticker-track">
           <button type="button" class="wx-ticker-item is-loading">Loading temperatures…</button>
@@ -1319,6 +1389,73 @@
     });
   }
 
+  function getTickerMode() {
+    try {
+      var m = localStorage.getItem('gw_web_ticker_mode');
+      if (m === 'worldwide' || m === 'nearby') return m;
+    } catch (_) {}
+    return 'nearby';
+  }
+  function setTickerMode(mode) {
+    if (mode !== 'worldwide') mode = 'nearby';
+    try { localStorage.setItem('gw_web_ticker_mode', mode); } catch (_) {}
+    syncTickerModeUi();
+  }
+  function syncTickerModeUi() {
+    var mode = getTickerMode();
+    var btn = document.getElementById('wx-ticker-mode-btn');
+    var text = btn && btn.querySelector('.wx-ticker-mode-text');
+    var menu = document.getElementById('wx-ticker-menu');
+    if (text) text.textContent = mode === 'worldwide' ? 'Worldwide' : 'Nearby';
+    if (btn) {
+      btn.title = mode === 'worldwide'
+        ? 'Major cities around the world — click to switch Nearby or Worldwide'
+        : 'Temperatures near your location — click to switch Nearby or Worldwide';
+    }
+    if (menu) {
+      menu.querySelectorAll('[data-mode]').forEach(function (opt) {
+        opt.setAttribute('aria-selected', opt.getAttribute('data-mode') === mode ? 'true' : 'false');
+      });
+    }
+  }
+  function closeTickerModeMenu() {
+    var btn = document.getElementById('wx-ticker-mode-btn');
+    var menu = document.getElementById('wx-ticker-menu');
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  function wireTickerMode() {
+    syncTickerModeUi();
+    var wrap = document.getElementById('wx-ticker-mode');
+    var btn = document.getElementById('wx-ticker-mode-btn');
+    var menu = document.getElementById('wx-ticker-menu');
+    if (!wrap || !btn || !menu) return;
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.hidden;
+      menu.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    menu.querySelectorAll('[data-mode]').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var next = opt.getAttribute('data-mode');
+        closeTickerModeMenu();
+        if (next === getTickerMode()) return;
+        setTickerMode(next);
+        lastTickerYouKey = '';
+        loadTicker();
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) closeTickerModeMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeTickerModeMenu();
+    });
+  }
+
   async function fetchWeather(lat, lon) {
     var units = getWebUnits();
     var params = new URLSearchParams({
@@ -1470,6 +1607,29 @@
     { name: 'Vancouver, BC', lat: 49.28, lon: -123.12 },
     { name: 'Monterrey, MX', lat: 25.69, lon: -100.32 },
   ];
+  // Major world hubs for Worldwide ticker mode
+  var TICKER_WORLD_CITIES = [
+    { name: 'New York, US', lat: 40.71, lon: -74.01 },
+    { name: 'Los Angeles, US', lat: 34.05, lon: -118.24 },
+    { name: 'Mexico City, MX', lat: 19.43, lon: -99.13 },
+    { name: 'São Paulo, BR', lat: -23.55, lon: -46.63 },
+    { name: 'London, UK', lat: 51.51, lon: -0.13 },
+    { name: 'Paris, FR', lat: 48.86, lon: 2.35 },
+    { name: 'Berlin, DE', lat: 52.52, lon: 13.41 },
+    { name: 'Madrid, ES', lat: 40.42, lon: -3.70 },
+    { name: 'Rome, IT', lat: 41.90, lon: 12.50 },
+    { name: 'Istanbul, TR', lat: 41.01, lon: 28.98 },
+    { name: 'Cairo, EG', lat: 30.04, lon: 31.24 },
+    { name: 'Johannesburg, ZA', lat: -26.20, lon: 28.05 },
+    { name: 'Dubai, AE', lat: 25.20, lon: 55.27 },
+    { name: 'Mumbai, IN', lat: 19.08, lon: 72.88 },
+    { name: 'Singapore, SG', lat: 1.35, lon: 103.82 },
+    { name: 'Hong Kong, HK', lat: 22.32, lon: 114.17 },
+    { name: 'Tokyo, JP', lat: 35.68, lon: 139.69 },
+    { name: 'Seoul, KR', lat: 37.57, lon: 126.98 },
+    { name: 'Sydney, AU', lat: -33.87, lon: 151.21 },
+    { name: 'Auckland, NZ', lat: -36.85, lon: 174.76 },
+  ];
   var TICKER_NEAR_MI = 280; // primary radius (~neighboring metros)
   var TICKER_WIDE_MI = 450; // expand if too few
   var TICKER_MAX = 14;
@@ -1613,14 +1773,35 @@
     });
   }
 
+  function worldTickerCities() {
+    return TICKER_WORLD_CITIES.map(function (c) {
+      return {
+        name: c.name,
+        fullLabel: c.name,
+        lat: c.lat,
+        lon: c.lon,
+        isYou: false,
+      };
+    });
+  }
+
+  var tickerLoadGen = 0;
   async function loadTicker() {
     var track = document.getElementById('wx-ticker-track');
     if (!track) return;
+    var gen = ++tickerLoadGen;
 
     var saved = getSavedLoc();
-    var cities = nearbyTickerCities(saved);
+    var mode = getTickerMode();
+    var cities = mode === 'worldwide' ? worldTickerCities() : nearbyTickerCities(saved);
 
     if (saved) {
+      // Avoid duplicating your city if it already appears in the worldwide list
+      if (mode === 'worldwide') {
+        cities = cities.filter(function (c) {
+          return milesBetween(saved.lat, saved.lon, c.lat, c.lon) > 18;
+        });
+      }
       cities.unshift({
         name: shortCityName(saved.label),
         fullLabel: saved.label,
@@ -1631,21 +1812,27 @@
     }
 
     if (!cities.length) {
+      if (gen !== tickerLoadGen) return;
       track.innerHTML = '';
       var wait = document.createElement('button');
       wait.type = 'button';
       wait.className = 'wx-ticker-item is-loading';
-      wait.textContent = 'Nearby temps appear after your location loads…';
+      wait.textContent = mode === 'worldwide'
+        ? 'Loading worldwide temperatures…'
+        : 'Nearby temps appear after your location loads…';
       track.appendChild(wait);
       return;
     }
 
     try {
-      tickerItems = await fetchTickerTemps(cities);
+      var items = await fetchTickerTemps(cities);
+      if (gen !== tickerLoadGen) return; // a newer mode/location load won
+      tickerItems = items;
       var you = cities.find(function (c) { return c.isYou; }) || cities[0];
       if (you) lastTickerYouKey = Number(you.lat).toFixed(2) + ',' + Number(you.lon).toFixed(2);
       renderTickerTrack();
     } catch (e) {
+      if (gen !== tickerLoadGen) return;
       console.warn('ticker', e);
       track.innerHTML = '';
       var err = document.createElement('button');
@@ -1852,6 +2039,7 @@
       if (mood === 'rain' && Math.random() < 0.12) flashLightning();
     }, 4000);
     wireUnitsToggle();
+    wireTickerMode();
     bootWeather();
     loadTicker();
     // Refresh ticker temps every 20 minutes
