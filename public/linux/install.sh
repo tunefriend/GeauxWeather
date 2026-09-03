@@ -99,6 +99,7 @@ else
 fi
 
 mkdir -p "${INSTALL_DIR}/icons" "${APP_DIR}" "${AUTO_DIR}" "${ICON_DIR}"
+mkdir -p "${HOME}/.config/geauxweather-widget"
 
 cp "${SCRIPT_DIR}/geauxweather_tray.py" "${INSTALL_DIR}/geauxweather_tray.py"
 chmod +x "${INSTALL_DIR}/geauxweather_tray.py"
@@ -108,7 +109,52 @@ if [[ -f "${SCRIPT_DIR}/icons/geauxweather.png" ]]; then
   cp "${SCRIPT_DIR}/icons/geauxweather.png" "${ICON_DIR}/geauxweather.png"
 fi
 
-# Applications menu — starts the tray (temp in top bar). If already running, opens the website.
+# Seed config.json once (do not overwrite user prefs on reinstall)
+CFG="${HOME}/.config/geauxweather-widget/config.json"
+if [[ ! -f "$CFG" ]]; then
+  echo "==> Creating default config (locale units + network location)…"
+  GEO_JSON=""
+  if need_cmd curl; then
+    GEO_JSON="$(curl -fsSL --max-time 6 https://geauxweather.com/api/geo 2>/dev/null || true)"
+  elif need_cmd wget; then
+    GEO_JSON="$(wget -qO- --timeout=6 https://geauxweather.com/api/geo 2>/dev/null || true)"
+  fi
+  GEO_JSON="$GEO_JSON" CFG="$CFG" LANG_ALL="${LC_ALL:-}${LC_MESSAGES:-}${LANG:-}" python3 <<'PY'
+import json, os
+path = os.environ["CFG"]
+lang = (os.environ.get("LANG_ALL") or "").lower()
+units = "fahrenheit" if "en_us" in lang else "celsius"
+cfg = {
+    "lat": 30.5021,
+    "lon": -90.7476,
+    "label": "Location unset — use Detect my location",
+    "units": units,
+    "source": "fallback",
+}
+raw = os.environ.get("GEO_JSON") or ""
+try:
+    d = json.loads(raw) if raw.strip() else {}
+except Exception:
+    d = {}
+lat, lon = d.get("lat"), d.get("lon")
+if lat is not None and lon is not None:
+    label = d.get("label") or d.get("city") or d.get("country") or f"{float(lat):.2f}, {float(lon):.2f}"
+    cfg = {
+        "lat": float(lat),
+        "lon": float(lon),
+        "label": str(label),
+        "units": units,
+        "source": "ip-geo",
+    }
+open(path, "w", encoding="utf-8").write(json.dumps(cfg, indent=2) + "\n")
+print("    Wrote", path)
+print("    Location:", cfg["label"], f"({cfg['units']})")
+PY
+else
+  echo "==> Keeping existing config: ${CFG}"
+fi
+
+# Applications menu — one launcher (starts tray; if already running, opens website)
 cat > "${APP_DIR}/geauxweather.desktop" <<EOF
 [Desktop Entry]
 Name=GeauxWeather
@@ -123,20 +169,14 @@ Keywords=weather;forecast;radar;tray;
 StartupNotify=false
 EOF
 
-cat > "${APP_DIR}/geauxweather-tray.desktop" <<EOF
-[Desktop Entry]
-Name=GeauxWeather Tray
-Comment=System tray weather + open GeauxWeather
-Exec=/usr/bin/python3 ${INSTALL_DIR}/geauxweather_tray.py
-Icon=${ICON_DIR}/geauxweather.png
-Terminal=false
-Type=Application
-NoDisplay=true
-EOF
+# Remove legacy duplicate app entry (older installs)
+rm -f "${APP_DIR}/geauxweather-tray.desktop"
 
+# Single autostart entry only (older installs had two and showed two icons)
+rm -f "${AUTO_DIR}/geauxweather.desktop"
 cat > "${AUTO_DIR}/geauxweather-tray.desktop" <<EOF
 [Desktop Entry]
-Name=GeauxWeather Tray
+Name=GeauxWeather
 Comment=System tray weather (background)
 Exec=/usr/bin/python3 ${INSTALL_DIR}/geauxweather_tray.py
 Icon=${ICON_DIR}/geauxweather.png
@@ -155,11 +195,12 @@ fi
 
 echo ""
 echo "Installed to ${INSTALL_DIR}"
+echo "Config: ${HOME}/.config/geauxweather-widget/config.json"
 echo ""
 echo "Start the tray:"
 echo "  /usr/bin/python3 ${INSTALL_DIR}/geauxweather_tray.py &"
 echo ""
-echo "Or open GeauxWeather from your app menu (starts the tray)."
-echo "Tray menu → Units for °C / °F. Icon shows condition + temperature."
+echo "Tray menu → Location (detect / search city) · Units (°C / °F)"
+echo "Only one autostart entry is installed (duplicate legacy entries removed)."
 echo ""
 echo "Website: https://geauxweather.com"

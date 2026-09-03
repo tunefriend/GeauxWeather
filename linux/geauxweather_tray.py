@@ -40,11 +40,13 @@ except Exception:
         AppIndicator3 = None
 
 WEBSITE = "https://geauxweather.com"
-DEFAULT_LAT = 30.5021
-DEFAULT_LON = -90.7476
-DEFAULT_LABEL = "Livingston, LA"
+GEO_URL = "https://geauxweather.com/api/geo"
+# Last-resort coords only if IP geo fails (US Gulf) — never left unsaved as a silent default
+FALLBACK_LAT = 30.5021
+FALLBACK_LON = -90.7476
+FALLBACK_LABEL = "Location unset — use Detect my location"
 REFRESH_SECONDS = 15 * 60
-UA = "GeauxWeather-LinuxTray/1.0 (+https://geauxweather.com)"
+UA = "GeauxWeather-LinuxTray/1.1 (+https://geauxweather.com)"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -52,24 +54,72 @@ def config_path() -> Path:
     return Path.home() / ".config" / "geauxweather-widget" / "config.json"
 
 
-def load_config() -> dict:
+def default_units_from_locale() -> str:
+    """°F for en_US; °C everywhere else (AU, EU, …)."""
+    lang = (
+        (os.environ.get("LC_ALL") or "")
+        + (os.environ.get("LC_MESSAGES") or "")
+        + (os.environ.get("LANG") or "")
+    ).lower()
+    if "en_us" in lang:
+        return "fahrenheit"
+    return "celsius"
+
+
+def detect_ip_location() -> dict | None:
+    """Approximate location from network IP (Cloudflare via geauxweather.com)."""
+    try:
+        data = http_get_json(GEO_URL, timeout=6.0)
+        lat, lon = data.get("lat"), data.get("lon")
+        if lat is None or lon is None:
+            return None
+        label = data.get("label") or data.get("city") or data.get("country")
+        if not label:
+            label = f"{float(lat):.2f}, {float(lon):.2f}"
+        return {"lat": float(lat), "lon": float(lon), "label": str(label)}
+    except Exception:
+        return None
+
+
+def ensure_config() -> dict:
+    """Load config, or create one on first run (IP geo + locale units)."""
     path = config_path()
     if path.is_file():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            cfg = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(cfg, dict) and cfg.get("lat") is not None and cfg.get("lon") is not None:
+                # Backfill units for older configs
+                if cfg.get("units") not in ("celsius", "fahrenheit"):
+                    cfg["units"] = default_units_from_locale()
+                    save_config(cfg)
+                return cfg
         except (OSError, json.JSONDecodeError):
             pass
-    units = "fahrenheit"
-    lang = (os.environ.get("LANG") or "") + (os.environ.get("LC_ALL") or "")
-    # Fresh installs outside en_US default to Celsius (e.g. Australia)
-    if "en_US" not in lang:
-        units = "celsius"
-    return {
-        "lat": DEFAULT_LAT,
-        "lon": DEFAULT_LON,
-        "label": DEFAULT_LABEL,
-        "units": units,
-    }
+
+    units = default_units_from_locale()
+    geo = detect_ip_location()
+    if geo:
+        cfg = {
+            "lat": geo["lat"],
+            "lon": geo["lon"],
+            "label": geo["label"],
+            "units": units,
+            "source": "ip-geo",
+        }
+    else:
+        cfg = {
+            "lat": FALLBACK_LAT,
+            "lon": FALLBACK_LON,
+            "label": FALLBACK_LABEL,
+            "units": units,
+            "source": "fallback",
+        }
+    save_config(cfg)
+    return cfg
+
+
+def load_config() -> dict:
+    return ensure_config()
 
 
 def save_config(cfg: dict) -> None:
@@ -339,6 +389,61 @@ def fetch_weather(lat: float, lon: float, units: str = "fahrenheit") -> dict:
     }
 
 
+def search_cities(query: str, count: int = 6) -> list:
+    q = (query or "").strip()
+    if len(q) < 2:
+        return []
+    params = urllib.parse.urlencode(
+        {"name": q, "count": count, "language": "en", "format": "json"}
+    )
+    data = http_get_json(f"https://geocoding-api.open-meteo.com/v1/search?{params}")
+    out = []
+    for r in data.get("results") or []:
+        parts = [r.get("name"), r.get("admin1"), r.get("country")]
+        label = ", ".join(p for p in parts if p)
+        out.append(
+            {
+                "lat": float(r["latitude"]),
+                "lon": float(r["longitude"]),
+                "label": label or r.get("name") or "Result",
+            }
+        )
+    return out
+
+
+def prompt_search_city(parent=None) -> dict | None:
+    """Simple GTK dialog: type a city, pick first match (or cancel)."""
+    dialog = Gtk.Dialog(title="GeauxWeather — Search city", modal=True)
+    if parent is not None:
+        dialog.set_transient_for(parent)
+    dialog.add_buttons(
+        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        "Search", Gtk.ResponseType.OK,
+    )
+    dialog.set_default_response(Gtk.ResponseType.OK)
+    box = dialog.get_content_area()
+    box.set_spacing(8)
+    box.set_border_width(12)
+    entry = Gtk.Entry()
+    entry.set_placeholder_text("City name (e.g. Marshall, Melbourne, Sydney)")
+    entry.set_activates_default(True)
+    box.add(entry)
+    hint = Gtk.Label(label="Uses Open-Meteo geocoding. First match is applied.")
+    hint.set_line_wrap(True)
+    box.add(hint)
+    dialog.show_all()
+    resp = dialog.run()
+    q = entry.get_text().strip()
+    dialog.destroy()
+    if resp != Gtk.ResponseType.OK or len(q) < 2:
+        return None
+    try:
+        results = search_cities(q)
+    except Exception:
+        return None
+    return results[0] if results else None
+
+
 def open_url(url: str) -> None:
     for cmd in (("xdg-open", url), ("gio", "open", url)):
         try:
@@ -379,9 +484,9 @@ class WeatherModel:
         def work() -> None:
             try:
                 wx = fetch_weather(
-                    float(self.cfg.get("lat", DEFAULT_LAT)),
-                    float(self.cfg.get("lon", DEFAULT_LON)),
-                    str(self.cfg.get("units", "fahrenheit")),
+                    float(self.cfg.get("lat", FALLBACK_LAT)),
+                    float(self.cfg.get("lon", FALLBACK_LON)),
+                    str(self.cfg.get("units", default_units_from_locale())),
                 )
                 GLib.idle_add(self._apply, wx, None)
             except Exception as exc:
@@ -395,13 +500,46 @@ class WeatherModel:
         save_config(self.cfg)
         self.refresh()
 
+    def set_location(self, lat: float, lon: float, label: str, source: str = "user") -> None:
+        self.cfg["lat"] = float(lat)
+        self.cfg["lon"] = float(lon)
+        self.cfg["label"] = str(label or "Saved location")
+        self.cfg["source"] = source
+        save_config(self.cfg)
+        self.refresh()
+
+    def detect_location(self) -> None:
+        """Re-run IP geo and save (tray menu)."""
+
+        def work() -> None:
+            geo = detect_ip_location()
+            if not geo:
+                GLib.idle_add(
+                    self._apply,
+                    None,
+                    "Could not detect location — search a city or open the website",
+                )
+                return
+            self.cfg["lat"] = geo["lat"]
+            self.cfg["lon"] = geo["lon"]
+            self.cfg["label"] = geo["label"]
+            self.cfg["source"] = "ip-geo"
+            if self.cfg.get("units") not in ("celsius", "fahrenheit"):
+                self.cfg["units"] = default_units_from_locale()
+            save_config(self.cfg)
+            self.refresh()
+
+        self.summary = "Detecting location…"
+        self.notify()
+        threading.Thread(target=work, daemon=True).start()
+
     def _apply(self, wx, err) -> bool:
-        label = str(self.cfg.get("label") or DEFAULT_LABEL)
-        units = unit_suffix(str(self.cfg.get("units", "fahrenheit")))
+        label = str(self.cfg.get("label") or FALLBACK_LABEL)
+        units = unit_suffix(str(self.cfg.get("units", default_units_from_locale())))
         if err or not wx:
             self.short = "GW"
             self.code = None
-            self.summary = "Weather unavailable — open site"
+            self.summary = err or "Weather unavailable — open site"
         else:
             temp = wx.get("temp")
             self.code = wx.get("code")
@@ -462,6 +600,17 @@ class IndicatorUI:
         refresh.connect("activate", lambda *_: model.refresh())
         self.menu.append(refresh)
 
+        loc_menu = Gtk.Menu()
+        item_detect = Gtk.MenuItem(label="Detect my location (network)")
+        item_detect.connect("activate", lambda *_: model.detect_location())
+        loc_menu.append(item_detect)
+        item_search = Gtk.MenuItem(label="Search city…")
+        item_search.connect("activate", lambda *_: self._search_city())
+        loc_menu.append(item_search)
+        loc_root = Gtk.MenuItem(label="Location")
+        loc_root.set_submenu(loc_menu)
+        self.menu.append(loc_root)
+
         units_menu = Gtk.Menu()
         item_c = Gtk.MenuItem(label="Celsius (°C)")
         item_c.connect("activate", lambda *_: model.set_units("celsius"))
@@ -486,6 +635,12 @@ class IndicatorUI:
             pass
         model.on_change(self.sync)
         self.sync()
+
+    def _search_city(self) -> None:
+        hit = prompt_search_city()
+        if not hit:
+            return
+        self.model.set_location(hit["lat"], hit["lon"], hit["label"], source="search")
 
     def sync(self) -> None:
         # Single panel entry: temperature drawn on transparent icon, no label

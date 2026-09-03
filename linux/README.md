@@ -65,16 +65,24 @@ bash uninstall.sh --purge
 
 ## Config
 
+Created automatically on first install / first tray start:
+
 `~/.config/geauxweather-widget/config.json`
 
 ```json
 {
-  "lat": 30.5021,
-  "lon": -90.7476,
-  "label": "Livingston, LA",
-  "units": "celsius"
+  "lat": -37.81,
+  "lon": 144.96,
+  "label": "Melbourne, Victoria",
+  "units": "celsius",
+  "source": "ip-geo"
 }
 ```
+
+- **units** default from locale (`en_US` → Fahrenheit, otherwise Celsius)
+- **location** from network IP via `https://geauxweather.com/api/geo` when possible
+- Tray menu → **Location** (Detect / Search city) and **Units** (°C / °F)
+- Reinstall never overwrites an existing config
 
 Weather: [Open-Meteo](https://open-meteo.com/) (no API key).
 
