@@ -156,8 +156,14 @@ def condition_emoji(code) -> str:
     return "☁"
 
 
-def draw_condition_mark(draw, code, box) -> None:
-    """Drawn weather mark — primary tray glyph (no font dependency)."""
+def draw_condition_mark(img, draw, code, box, is_day: bool = True) -> None:
+    """Drawn weather mark — primary tray glyph (no font dependency).
+
+    Clear / partly cloudy use a moon at night (is_day=False) so 11pm
+    never shows a sun.
+    """
+    from PIL import Image, ImageDraw
+
     x0, y0, x1, y1 = box
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     r = min(x1 - x0, y1 - y0) * 0.32
@@ -165,8 +171,8 @@ def draw_condition_mark(draw, code, box) -> None:
         c = int(code) if code is not None else -1
     except (TypeError, ValueError):
         c = -1
-    if c == 0:
-        # Sun
+
+    def draw_sun() -> None:
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 196, 72, 255))
         for ang in range(0, 360, 45):
             rad = ang * math.pi / 180.0
@@ -175,12 +181,39 @@ def draw_condition_mark(draw, code, box) -> None:
             x_b = cx + (r + 7) * math.cos(rad)
             y_b = cy + (r + 7) * math.sin(rad)
             draw.line((x_a, y_a, x_b, y_b), fill=(255, 196, 72, 255), width=2)
-    elif c in (1, 2):
-        # Partly cloudy
-        draw.ellipse(
-            (cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35),
-            fill=(255, 196, 72, 255),
+
+    def draw_moon(at_cx=None, at_cy=None, at_r=None) -> None:
+        """Crescent moon with a real transparent cutout (works on any panel)."""
+        mx = cx if at_cx is None else at_cx
+        my = cy if at_cy is None else at_cy
+        mr = r if at_r is None else at_r
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ld = ImageDraw.Draw(layer)
+        ld.ellipse((mx - mr, my - mr, mx + mr, my + mr), fill=(230, 235, 255, 255))
+        mask = Image.new("L", img.size, 0)
+        md = ImageDraw.Draw(mask)
+        md.ellipse((mx - mr, my - mr, mx + mr, my + mr), fill=255)
+        # Offset disc punches the crescent hole
+        md.ellipse(
+            (mx - mr * 0.1, my - mr * 0.95, mx + mr * 1.3, my + mr * 0.95),
+            fill=0,
         )
+        img.paste(layer, (0, 0), mask)
+
+    if c == 0:
+        if is_day:
+            draw_sun()
+        else:
+            draw_moon()
+    elif c in (1, 2):
+        # Partly cloudy — sun or moon peeking behind cloud
+        if is_day:
+            draw.ellipse(
+                (cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35),
+                fill=(255, 196, 72, 255),
+            )
+        else:
+            draw_moon(at_cx=cx - r * 0.25, at_cy=cy - r * 0.45, at_r=r * 0.7)
         draw.ellipse(
             (cx - r * 0.2, cy - r * 0.15, cx + r * 1.05, cy + r * 0.85),
             fill=(210, 220, 235, 230),
@@ -283,11 +316,11 @@ def _load_font(size: int, simple_symbol: bool = False):
     return ImageFont.load_default()
 
 
-def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
+def render_tray_icon(temp_text: str, weather_code, out_path: Path, is_day: bool = True) -> str:
     """Draw condition (Pillow shapes) + temperature — no emoji-font dependency.
 
     Color-emoji / PUA weather fonts often show as □ on Mint/Cinnamon trays.
-    Drawn marks always work; simple Unicode is only a secondary attempt.
+    Drawn marks always work; clear night uses a moon (not a sun).
     """
     from PIL import Image, ImageDraw
 
@@ -297,7 +330,7 @@ def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
     draw = ImageDraw.Draw(img)
 
     # Primary: vector-style mark (Tony Mint case — never a tofu box)
-    draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
+    draw_condition_mark(img, draw, weather_code, (2, 2, 34, 34), is_day=is_day)
 
     text = (temp_text or "—").strip()[:4]
     fs = 24 if len(text) <= 3 else 20
@@ -317,16 +350,16 @@ def render_temp_icon(temp_text: str, out_path: Path) -> str:
     return render_tray_icon(temp_text, None, out_path)
 
 
-def find_icon(code=None) -> str:
+def find_icon(code=None, is_day: bool = True) -> str:
     """Theme fallback if Pillow is missing."""
     try:
         c = int(code) if code is not None else -1
     except (TypeError, ValueError):
         c = -1
     if c == 0:
-        return "weather-clear"
+        return "weather-clear" if is_day else "weather-clear-night"
     if c in (1, 2):
-        return "weather-few-clouds"
+        return "weather-few-clouds" if is_day else "weather-few-clouds-night"
     if c == 3:
         return "weather-overcast"
     if 51 <= c <= 67 or 80 <= c <= 82:
@@ -335,7 +368,7 @@ def find_icon(code=None) -> str:
         return "weather-snow"
     if c >= 95:
         return "weather-storm"
-    return "weather-few-clouds"
+    return "weather-few-clouds" if is_day else "weather-few-clouds-night"
 
 
 
@@ -375,17 +408,23 @@ def fetch_weather(lat: float, lon: float, units: str = "fahrenheit") -> dict:
         {
             "latitude": lat,
             "longitude": lon,
-            "current": "temperature_2m,weather_code,apparent_temperature",
+            "current": "temperature_2m,weather_code,apparent_temperature,is_day",
             "temperature_unit": units,
             "timezone": "auto",
         }
     )
     data = http_get_json(f"https://api.open-meteo.com/v1/forecast?{params}")
     cur = data.get("current") or {}
+    is_day_raw = cur.get("is_day")
+    try:
+        is_day = int(is_day_raw) != 0 if is_day_raw is not None else True
+    except (TypeError, ValueError):
+        is_day = True
     return {
         "temp": cur.get("temperature_2m"),
         "feels": cur.get("apparent_temperature"),
         "code": cur.get("weather_code"),
+        "is_day": is_day,
     }
 
 
@@ -471,6 +510,7 @@ class WeatherModel:
         self.summary = "Loading…"
         self.short = "GW"
         self.code = None
+        self.is_day = True
         self.listeners: list = []
 
     def on_change(self, cb) -> None:
@@ -539,11 +579,21 @@ class WeatherModel:
         if err or not wx:
             self.short = "GW"
             self.code = None
+            self.is_day = True
             self.summary = err or "Weather unavailable — open site"
         else:
             temp = wx.get("temp")
             self.code = wx.get("code")
+            self.is_day = bool(wx.get("is_day", True))
             cond = code_label(self.code)
+            if not self.is_day and self.code in (0, 1, 2):
+                # Make the menu text honest at night
+                if self.code == 0:
+                    cond = "Clear night"
+                elif self.code == 1:
+                    cond = "Mostly clear night"
+                else:
+                    cond = "Partly cloudy night"
             if temp is None:
                 self.short = "GW"
                 self.summary = f"{label} · {cond}"
@@ -647,8 +697,11 @@ class IndicatorUI:
         try:
             # Unique filename so the panel reloads the image when temp changes
             safe = "".join(ch if ch.isalnum() or ch in ".-" else "_" for ch in self.model.short)
-            path = self._icon_dir / f"tray-{safe}-{self.model.code}.png"
-            rendered = render_tray_icon(self.model.short, self.model.code, path)
+            day_tag = "d" if self.model.is_day else "n"
+            path = self._icon_dir / f"tray-{safe}-{self.model.code}-{day_tag}.png"
+            rendered = render_tray_icon(
+                self.model.short, self.model.code, path, is_day=self.model.is_day
+            )
             self.indicator.set_icon_full(rendered, self.model.summary or "GeauxWeather")
             # Drop any leftover label from older builds
             try:
@@ -657,7 +710,7 @@ class IndicatorUI:
                 pass
         except Exception:
             try:
-                self.indicator.set_icon(find_icon(self.model.code))
+                self.indicator.set_icon(find_icon(self.model.code, is_day=self.model.is_day))
             except Exception:
                 pass
         self.indicator.set_title(self.model.summary)
