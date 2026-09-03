@@ -11,6 +11,7 @@ Fallback: small always-on-top panel if AppIndicator GIR is missing.
 from __future__ import annotations
 
 import json
+import math
 import os
 import signal
 import subprocess
@@ -80,32 +81,33 @@ def save_config(cfg: dict) -> None:
 
 
 def condition_emoji(code) -> str:
-    """Map WMO weather_code → emoji (includes Overcast=3 → ☁)."""
+    """Map WMO weather_code → widely supported BMP Unicode (Mint-safe).
+
+    Avoids color-emoji / Private-Use weather fonts that often render as □.
+    """
     try:
         c = int(code) if code is not None else -1
     except (TypeError, ValueError):
         c = -1
     if c == 0:
         return "☀"
-    if c == 1:
-        return "🌤"
-    if c == 2:
-        return "⛅"
+    if c in (1, 2):
+        return "☁"
     if c == 3:
-        return "☁"  # Overcast — must not fall back to sun
+        return "☁"
     if 45 <= c <= 48:
-        return "🌫"
+        return "~"
     if 51 <= c <= 67 or 80 <= c <= 82:
-        return "🌧"
+        return "☂"
     if 71 <= c <= 77:
         return "❄"
     if c >= 95:
-        return "⛈"
+        return "⚡"
     return "☁"
 
 
 def draw_condition_mark(draw, code, box) -> None:
-    """Drawn weather mark when emoji fonts are unavailable."""
+    """Drawn weather mark — primary tray glyph (no font dependency)."""
     x0, y0, x1, y1 = box
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     r = min(x1 - x0, y1 - y0) * 0.32
@@ -114,8 +116,17 @@ def draw_condition_mark(draw, code, box) -> None:
     except (TypeError, ValueError):
         c = -1
     if c == 0:
+        # Sun
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 196, 72, 255))
+        for ang in range(0, 360, 45):
+            rad = ang * math.pi / 180.0
+            x_a = cx + (r + 2) * math.cos(rad)
+            y_a = cy + (r + 2) * math.sin(rad)
+            x_b = cx + (r + 7) * math.cos(rad)
+            y_b = cy + (r + 7) * math.sin(rad)
+            draw.line((x_a, y_a, x_b, y_b), fill=(255, 196, 72, 255), width=2)
     elif c in (1, 2):
+        # Partly cloudy
         draw.ellipse(
             (cx - r * 0.85, cy - r * 1.05, cx + r * 0.55, cy + r * 0.35),
             fill=(255, 196, 72, 255),
@@ -131,32 +142,48 @@ def draw_condition_mark(draw, code, box) -> None:
             fill=(190, 200, 215, 235),
         )
     elif 45 <= c <= 48:
+        # Fog bands
         draw.ellipse(
             (cx - r * 1.0, cy - r * 0.4, cx + r * 1.0, cy + r * 0.55),
             fill=(180, 190, 200, 180),
         )
-    elif 51 <= c <= 67 or 80 <= c <= 82 or c >= 95:
-        draw.ellipse(
-            (cx - r * 0.95, cy - r * 0.85, cx + r * 0.95, cy + r * 0.35),
-            fill=(170, 185, 205, 240),
-        )
-        for dx in (-6, 0, 6):
+        for dy in (-4, 2, 8):
             draw.line(
-                (cx + dx, cy + 4, cx + dx - 2, cy + 12),
-                fill=(120, 170, 255, 255),
+                (cx - r * 0.9, cy + dy, cx + r * 0.9, cy + dy),
+                fill=(200, 210, 220, 200),
                 width=2,
             )
-        if c >= 95:
-            draw.polygon(
-                [
-                    (cx + 2, cy - 2),
-                    (cx - 4, cy + 6),
-                    (cx + 1, cy + 6),
-                    (cx - 3, cy + 14),
-                ],
-                fill=(255, 220, 80, 255),
+    elif 51 <= c <= 67 or 80 <= c <= 82:
+        # Rain: cloud + drops (clearer than missing emoji fonts)
+        draw.ellipse(
+            (cx - r * 0.95, cy - r * 0.95, cx + r * 0.95, cy + r * 0.25),
+            fill=(170, 185, 205, 240),
+        )
+        for dx in (-7, -2, 3, 8):
+            draw.line(
+                (cx + dx, cy + 2, cx + dx - 2, cy + 12),
+                fill=(110, 165, 255, 255),
+                width=2,
             )
+    elif c >= 95:
+        # Thunder: cloud + bolt
+        draw.ellipse(
+            (cx - r * 0.95, cy - r * 0.95, cx + r * 0.95, cy + r * 0.2),
+            fill=(150, 160, 180, 240),
+        )
+        draw.polygon(
+            [
+                (cx + 3, cy - 4),
+                (cx - 5, cy + 5),
+                (cx + 0, cy + 5),
+                (cx - 4, cy + 15),
+                (cx + 6, cy + 2),
+                (cx + 1, cy + 2),
+            ],
+            fill=(255, 220, 80, 255),
+        )
     elif 71 <= c <= 77:
+        # Snow
         draw.ellipse(
             (cx - r, cy - r * 0.7, cx + r, cy + r * 0.4),
             fill=(220, 230, 245, 240),
@@ -179,17 +206,17 @@ def draw_condition_mark(draw, code, box) -> None:
         )
 
 
-def _load_font(size: int, emoji: bool = False):
+def _load_font(size: int, simple_symbol: bool = False):
     from PIL import ImageFont
 
-    candidates = []
-    if emoji:
+    if simple_symbol:
+        # BMP weather symbols (☀☁☂❄⚡) — DejaVu/Symbola; not Noto Color Emoji
         candidates = [
-            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
-            "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf",
-            "/usr/share/fonts/opentype/noto/NotoColorEmoji.ttf",
-            "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
     else:
         candidates = [
@@ -207,7 +234,11 @@ def _load_font(size: int, emoji: bool = False):
 
 
 def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
-    """Draw condition (emoji preferred) + temperature on a transparent panel icon."""
+    """Draw condition (Pillow shapes) + temperature — no emoji-font dependency.
+
+    Color-emoji / PUA weather fonts often show as □ on Mint/Cinnamon trays.
+    Drawn marks always work; simple Unicode is only a secondary attempt.
+    """
     from PIL import Image, ImageDraw
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,33 +246,12 @@ def render_tray_icon(temp_text: str, weather_code, out_path: Path) -> str:
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    glyph = condition_emoji(weather_code)
-    used_emoji = False
-    # Prefer emoji glyphs (Mint/Cinnamon + fonts-noto-color-emoji) — clearer than shapes
-    for size in (20, 22, 18, 109):
-        try:
-            emoji_font = _load_font(size, emoji=True)
-            eb = draw.textbbox((0, 0), glyph, font=emoji_font)
-            ew, eh = eb[2] - eb[0], eb[3] - eb[1]
-            if ew < 8 or eh < 8:
-                continue
-            ex = 6 - eb[0]
-            ey = (h - eh) / 2 - eb[1]
-            try:
-                draw.text((ex, ey), glyph, font=emoji_font, embedded_color=True)
-            except TypeError:
-                draw.text((ex, ey), glyph, font=emoji_font, fill=(235, 240, 250, 255))
-            used_emoji = True
-            break
-        except Exception:
-            continue
-
-    if not used_emoji:
-        draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
+    # Primary: vector-style mark (Tony Mint case — never a tofu box)
+    draw_condition_mark(draw, weather_code, (2, 2, 34, 34))
 
     text = (temp_text or "—").strip()[:4]
     fs = 24 if len(text) <= 3 else 20
-    font = _load_font(fs, emoji=False)
+    font = _load_font(fs, simple_symbol=False)
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     x = 40 + max(0, (w - 44 - tw) / 2) - bbox[0]

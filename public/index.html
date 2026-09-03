@@ -1358,7 +1358,11 @@
   }
   function setWebUnits(u) {
     if (u !== 'metric' && u !== 'imperial') u = 'imperial';
-    try { localStorage.setItem('gw_web_units', u); } catch (_) {}
+    try {
+      localStorage.setItem('gw_web_units', u);
+      // Keep maps.js (which also reads `units`) in sync with °C/°F
+      localStorage.setItem('units', u);
+    } catch (_) {}
     syncUnitsButtons();
   }
   function syncUnitsButtons() {
@@ -1369,6 +1373,8 @@
     if (bc) bc.classList.toggle('active', u === 'metric');
   }
   function wireUnitsToggle() {
+    // Ensure maps.js sees the same preference as the website °C/°F toggle
+    try { localStorage.setItem('units', getWebUnits()); } catch (_) {}
     syncUnitsButtons();
     ['wx-units-f', 'wx-units-c'].forEach(function (id) {
       var btn = document.getElementById(id);

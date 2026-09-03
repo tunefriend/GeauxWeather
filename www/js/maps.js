@@ -670,8 +670,27 @@
 
   // ─── Wind field (Open-Meteo grid + particles) ───────────────────────────
 
+  function mapUnits() {
+    try {
+      var u = localStorage.getItem('gw_web_units') || localStorage.getItem('units');
+      if (u === 'metric' || u === 'imperial') return u;
+    } catch (_) {}
+    return 'imperial';
+  }
   function windUnits() {
-    return localStorage.getItem('units') === 'metric' ? 'metric' : 'imperial';
+    return mapUnits();
+  }
+  /** Format a distance stored in miles using the active °C/°F unit preference. */
+  function formatDistanceMi(mi, opts) {
+    opts = opts || {};
+    if (mi == null || isNaN(Number(mi))) return '—';
+    var n = Number(mi);
+    if (mapUnits() === 'metric') {
+      var km = n * 1.60934;
+      var val = km < 10 && !opts.round ? km.toFixed(1) : String(Math.round(km));
+      return (opts.approx ? '~' : '') + val + ' km';
+    }
+    return (opts.approx ? '~' : '') + Math.round(n) + ' mi';
   }
 
   /** Color scale is defined in mph for consistent appearance across unit settings. */
@@ -2360,7 +2379,7 @@
           escapeHtml(flowStr) +
           '</strong></div>' +
           '<div class="storm-popup-meta">' +
-          escapeHtml(Math.round(g.mi) + ' mi from weather location') +
+          escapeHtml(formatDistanceMi(g.mi) + ' from weather location') +
           '</div>' +
           '<div class="storm-popup-meta">Observed ' +
           escapeHtml(whenStr) +
@@ -2412,7 +2431,7 @@
               '<p class="muted small">Nearest: ' +
               escapeHtml(nearest.name) +
               ' · ' +
-              escapeHtml(Math.round(nearest.mi) + ' mi') +
+              escapeHtml(formatDistanceMi(nearest.mi)) +
               '</p>'
             : '<p class="muted">No gauges returned</p>') +
           '<p class="muted small">↑ rising · ↓ falling · Low/High vs flood stage or recent range · USGS live data</p>';
@@ -2787,7 +2806,7 @@
           escapeHtml(p.detail || '') +
           '</div>' +
           '<div class="storm-popup-meta">' +
-          escapeHtml(Math.round(p.mi) + ' mi from your location') +
+          escapeHtml(formatDistanceMi(p.mi) + ' from your location') +
           '</div>' +
           '<div class="storm-popup-meta muted">Not a paid lightning-strike network — NWS alerts + weather model cells</div>'
       );
@@ -2909,8 +2928,14 @@
           escapeHtml(
             points.length
               ? near
-                ? near + ' within ~50 mi of ' + (origin.label || 'you')
-                : 'Nearest storm activity is beyond 50 mi of ' +
+                ? near +
+                  ' within ' +
+                  formatDistanceMi(50, { approx: true, round: true }) +
+                  ' of ' +
+                  (origin.label || 'you')
+                : 'Nearest storm activity is beyond ' +
+                  formatDistanceMi(50, { round: true }) +
+                  ' of ' +
                   (origin.label || 'your pin')
               : 'No NWS storm warnings and no model storm cells near ' +
                   (origin.label || 'your pin') +

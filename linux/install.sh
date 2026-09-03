@@ -67,8 +67,7 @@ install_deps_debian() {
   dpkg -s gir1.2-gtk-3.0 >/dev/null 2>&1 || missing+=(gir1.2-gtk-3.0)
   dpkg -s gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1 || missing+=(gir1.2-ayatanaappindicator3-0.1)
   dpkg -s python3-pil >/dev/null 2>&1 || missing+=(python3-pil)
-  # Emoji fonts help the tray show ☁☀🌧 glyphs clearly (Cinnamon/Mint)
-  dpkg -s fonts-noto-color-emoji >/dev/null 2>&1 || missing+=(fonts-noto-color-emoji)
+  # Tray weather marks are drawn with Pillow (no emoji / icon font required).
 
   if is_gnome_like; then
     dpkg -s gnome-shell-extension-appindicator >/dev/null 2>&1 || missing+=(gnome-shell-extension-appindicator)
