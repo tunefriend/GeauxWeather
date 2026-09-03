@@ -981,26 +981,38 @@
           Works on <strong>all major Linux desktops</strong> with a system tray /
           status area — <strong>GNOME, KDE Plasma, XFCE, Cinnamon, MATE, Budgie, LXQt</strong>,
           and others that support AppIndicator / StatusNotifier.
-          Shows the temperature in the panel and opens this site. Also adds a
-          <strong>GeauxWeather</strong> app launcher. Best on Debian / Ubuntu
+          Shows <strong>condition + temperature</strong> in the panel and opens this site.
+          Also adds a <strong>GeauxWeather</strong> app launcher. Best on Debian / Ubuntu / Mint
           (one-line install); other distros need the same Python/GTK packages.
         </p>
-        <p style="margin-top:12px"><strong>One-line install:</strong></p>
+        <p style="margin-top:12px"><strong>One-line install (recommended):</strong></p>
         <pre class="codeblock" id="linux-install-cmd">curl -fsSL https://geauxweather.com/linux/install.sh | bash</pre>
-        <p class="muted-line">Then start the tray:</p>
+        <p class="muted-line">Then start the tray (or log out/in — it autostarts):</p>
         <pre class="codeblock">python3 ~/.local/share/geauxweather-widget/geauxweather_tray.py &amp;</pre>
         <div class="links" style="margin-top:14px">
           <a class="btn btn-secondary" href="/linux/geauxweather-linux-tray.tar.gz">Download .tar.gz</a>
           <a class="btn btn-secondary" href="https://github.com/tunefriend/GeauxWeather/tree/main/linux">Source on GitHub</a>
         </div>
-        <p class="muted-line" style="margin-top:12px">
+        <p class="muted-line" style="margin-top:14px">
+          <strong>What the installer sets up:</strong>
+          <br />• Approximates your location from your network (not hard-coded to Louisiana)
+          <br />• Defaults to <strong>°C</strong> outside the US (<code>en_US</code> → °F)
+          <br />• Writes <code>~/.config/geauxweather-widget/config.json</code> (kept on reinstall)
+          <br />• <strong>One</strong> autostart entry (no duplicate tray icons)
+          <br />• Drawn weather icons (no special emoji font required)
+        </p>
+        <p class="muted-line" style="margin-top:10px">
+          <strong>Tray menu:</strong> Location (Detect my location / Search city…) · Units (°C / °F) · Refresh · Open website
+          <br />
           <strong>Any desktop:</strong> app menu → <strong>GeauxWeather</strong> starts the tray
-          (if it’s already running, opens the website). Autostarts at login.
-          After Quit, open GeauxWeather from the menu again to bring the temp back.
+          (if it’s already running, opens the website).
           <br />
           <strong>GNOME:</strong> needs the AppIndicator extension (install script adds it on Debian/Ubuntu).
           <br />
           <strong>KDE / XFCE / Cinnamon / MATE / Budgie / LXQt:</strong> tray icons work natively — no extra extension.
+          <br />
+          <strong>Update / reinstall:</strong> run the same one-line install again, then restart the tray
+          with <code>killall geauxweather_tray.py</code> and start it again (or log out/in). Your config is preserved.
         </p>
       </div>
     </section>

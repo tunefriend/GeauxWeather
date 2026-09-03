@@ -3,11 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="refresh" content="0;url=https://geauxweather.com/#linux" />
-  <title>GeauxWeather Linux install</title>
-  <link rel="canonical" href="https://geauxweather.com/#linux" />
+  <title>GeauxWeather — Linux tray install</title>
+  <link rel="canonical" href="https://geauxweather.com/linux/" />
+  <meta name="description" content="Install the GeauxWeather Linux desktop tray: one-line curl install for GNOME, KDE, XFCE, Cinnamon, and more." />
+  <style>
+    :root { color-scheme: dark; --bg:#0b1220; --card:#121a2a; --text:#e8eef8; --muted:#9fb0c6; --accent:#3d8bfd; --border:rgba(255,255,255,0.12); }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+    .wrap { max-width:720px; margin:0 auto; padding:28px 20px 64px; }
+    h1 { font-size:1.6rem; margin:0 0 8px; }
+    h2 { font-size:1.1rem; margin:28px 0 10px; }
+    p, li { color:var(--muted); }
+    a { color:var(--accent); }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 18px 8px; margin-top:16px; }
+    pre { background:#0a101c; border:1px solid var(--border); border-radius:10px; padding:12px 14px; overflow-x:auto; color:#d7e6ff; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:0.92em; }
+    .btn { display:inline-block; margin:6px 8px 6px 0; padding:10px 14px; border-radius:999px; background:rgba(61,139,253,0.18); border:1px solid rgba(61,139,253,0.45); color:var(--text); text-decoration:none; font-weight:600; }
+    .btn:hover { background:rgba(61,139,253,0.28); }
+    ul { padding-left:1.2em; }
+  </style>
 </head>
 <body>
-  <p>See <a href="https://geauxweather.com/#linux">geauxweather.com/#linux</a> for install instructions.</p>
+  <div class="wrap">
+    <h1>GeauxWeather Linux tray</h1>
+    <p>Panel temperature + weather condition for GNOME, KDE, XFCE, Cinnamon, MATE, Budgie, LXQt, and other AppIndicator desktops.</p>
+
+    <div class="card">
+      <h2>One-line install</h2>
+      <pre><code>curl -fsSL https://geauxweather.com/linux/install.sh | bash</code></pre>
+      <p>Then start (or log out/in — it autostarts):</p>
+      <pre><code>python3 ~/.local/share/geauxweather-widget/geauxweather_tray.py &amp;</code></pre>
+      <p>
+        <a class="btn" href="/linux/geauxweather-linux-tray.tar.gz">Download .tar.gz</a>
+        <a class="btn" href="https://geauxweather.com/#linux">Full site section</a>
+        <a class="btn" href="https://github.com/tunefriend/GeauxWeather/tree/main/linux">Source</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>What you get</h2>
+      <ul>
+        <li>Location from your network IP (not hard-coded to Louisiana)</li>
+        <li>°C by default outside the US (<code>en_US</code> → °F)</li>
+        <li>Config at <code>~/.config/geauxweather-widget/config.json</code> (kept on reinstall)</li>
+        <li>A single autostart entry (no duplicate icons)</li>
+        <li>Drawn weather icons (no special emoji font required)</li>
+        <li>Tray menu: Location (detect / search city) · Units · Refresh · Open website</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Update</h2>
+      <p>Run the same one-line install again, then restart the tray:</p>
+      <pre><code>killall geauxweather_tray.py 2&gt;/dev/null || true
+python3 ~/.local/share/geauxweather-widget/geauxweather_tray.py &amp;</code></pre>
+      <p>Your existing config is not overwritten.</p>
+    </div>
+
+    <p style="margin-top:24px"><a href="https://geauxweather.com/">← Back to GeauxWeather</a></p>
+  </div>
 </body>
 </html>
