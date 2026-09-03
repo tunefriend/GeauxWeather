@@ -25,7 +25,8 @@ resolve_script_dir() {
   # Piped / remote install — download the tray package
   local tmp
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/geauxweather-install.XXXXXX")"
-  echo "==> Downloading tray package…"
+  # Progress must go to stderr — stdout is captured into SCRIPT_DIR
+  echo "==> Downloading tray package…" >&2
   if need_cmd curl; then
     curl -fsSL "$TRAY_URL" -o "${tmp}/tray.tgz"
   elif need_cmd wget; then
