@@ -428,59 +428,273 @@ def fetch_weather(lat: float, lon: float, units: str = "fahrenheit") -> dict:
     }
 
 
-def search_cities(query: str, count: int = 6) -> list:
+# Prefer populated places; demote dams/airports/etc. (Tony: "Livingston LA" → dam)
+_CITY_FEATURE_PREFIXES = ("PPL",)  # PPL, PPLA, PPLA2, PPLC, PPLX, …
+_DEMOTE_FEATURES = {
+    "DAM", "AIRP", "RSTN", "RSTP", "MT", "HLL", "PK", "PASS", "ISL", "PEN",
+    "BAY", "LK", "RSV", "STM", "FRST", "PRK", "RES", "MNQR", "OILF",
+}
+
+_US_STATE_ABBR = {
+    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas",
+    "ca": "California", "co": "Colorado", "ct": "Connecticut", "de": "Delaware",
+    "fl": "Florida", "ga": "Georgia", "hi": "Hawaii", "id": "Idaho",
+    "il": "Illinois", "in": "Indiana", "ia": "Iowa", "ks": "Kansas",
+    "ky": "Kentucky", "la": "Louisiana", "me": "Maine", "md": "Maryland",
+    "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota", "ms": "Mississippi",
+    "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada",
+    "nh": "New Hampshire", "nj": "New Jersey", "nm": "New Mexico", "ny": "New York",
+    "nc": "North Carolina", "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma",
+    "or": "Oregon", "pa": "Pennsylvania", "ri": "Rhode Island", "sc": "South Carolina",
+    "sd": "South Dakota", "tn": "Tennessee", "tx": "Texas", "ut": "Utah",
+    "vt": "Vermont", "va": "Virginia", "wa": "Washington", "wv": "West Virginia",
+    "wi": "Wisconsin", "wy": "Wyoming", "dc": "District of Columbia",
+}
+
+_AU_STATE_ABBR = {
+    "nsw": "New South Wales", "vic": "Victoria", "qld": "Queensland",
+    "sa": "South Australia", "wa": "Western Australia", "tas": "Tasmania",
+    "nt": "Northern Territory", "act": "Australian Capital Territory",
+}
+
+
+def _query_variants(query: str) -> list:
+    """Open-Meteo is picky: 'Livingston LA' ≠ 'Livingston, LA'."""
     q = (query or "").strip()
     if len(q) < 2:
         return []
-    params = urllib.parse.urlencode(
-        {"name": q, "count": count, "language": "en", "format": "json"}
-    )
-    data = http_get_json(f"https://geocoding-api.open-meteo.com/v1/search?{params}")
+    variants = [q]
+    # "City ST" → "City, ST" and "City, StateName"
+    parts = q.replace(",", " ").split()
+    if len(parts) >= 2:
+        abbr = parts[-1].lower()
+        city = " ".join(parts[:-1]).strip(" ,")
+        if city:
+            variants.append(f"{city}, {parts[-1].upper()}")
+            if abbr in _US_STATE_ABBR:
+                variants.append(f"{city}, {_US_STATE_ABBR[abbr]}")
+            if abbr in _AU_STATE_ABBR:
+                variants.append(f"{city}, {_AU_STATE_ABBR[abbr]}")
+                variants.append(city)  # Marshall / Marshalltown
+    # Dedupe preserving order
+    seen = set()
     out = []
-    for r in data.get("results") or []:
-        parts = [r.get("name"), r.get("admin1"), r.get("country")]
-        label = ", ".join(p for p in parts if p)
+    for v in variants:
+        key = v.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(v)
+    return out
+
+
+def _score_place(r: dict, query: str) -> tuple:
+    """Lower is better for sort."""
+    name = (r.get("name") or "").lower()
+    admin1 = (r.get("admin1") or "").lower()
+    country = (r.get("country") or "").lower()
+    feature = (r.get("feature_code") or "").upper()
+    pop = r.get("population") or 0
+    q = (query or "").lower().replace(",", " ")
+    tokens = [t for t in q.split() if t]
+
+    score = 0
+    # Prefer cities/towns
+    if feature.startswith("PPL"):
+        score -= 50
+    elif feature in _DEMOTE_FEATURES or feature.startswith("DAM"):
+        score += 200
+    else:
+        score += 40
+
+    # Exact / prefix name match
+    city_tok = tokens[0] if tokens else ""
+    if city_tok and name == city_tok:
+        score -= 30
+    elif city_tok and name.startswith(city_tok):
+        score -= 15
+    elif city_tok and city_tok in name:
+        score -= 5
+
+    # State / region match (LA → Louisiana, VIC → Victoria)
+    region_hints = []
+    for t in tokens[1:]:
+        region_hints.append(t)
+        if t in _US_STATE_ABBR:
+            region_hints.append(_US_STATE_ABBR[t].lower())
+        if t in _AU_STATE_ABBR:
+            region_hints.append(_AU_STATE_ABBR[t].lower())
+    for hint in region_hints:
+        if hint and (hint == admin1 or hint in admin1 or admin1.startswith(hint)):
+            score -= 40
+            break
+
+    # Population bump (known cities over obscure POIs)
+    if pop:
+        score -= min(25, int(pop) // 5000)
+
+    # Slight preference for US/AU when query looks local
+    if "australia" in country:
+        score -= 2
+    if "united states" in country:
+        score -= 1
+
+    return (score, -int(pop or 0), name)
+
+
+def search_cities(query: str, count: int = 10) -> list:
+    q = (query or "").strip()
+    if len(q) < 2:
+        return []
+    # Gather from a few query spellings, then rank
+    by_key = {}
+    for variant in _query_variants(q):
+        params = urllib.parse.urlencode(
+            {"name": variant, "count": count, "language": "en", "format": "json"}
+        )
+        try:
+            data = http_get_json(
+                f"https://geocoding-api.open-meteo.com/v1/search?{params}",
+                timeout=8.0,
+            )
+        except Exception:
+            continue
+        for r in data.get("results") or []:
+            try:
+                lat = float(r["latitude"])
+                lon = float(r["longitude"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            key = (round(lat, 3), round(lon, 3))
+            parts = [r.get("name"), r.get("admin1"), r.get("country")]
+            label = ", ".join(p for p in parts if p)
+            item = {
+                "lat": lat,
+                "lon": lon,
+                "label": label or r.get("name") or "Result",
+                "name": r.get("name") or "",
+                "admin1": r.get("admin1") or "",
+                "country": r.get("country") or "",
+                "feature_code": r.get("feature_code") or "",
+                "population": r.get("population") or 0,
+                "_score": _score_place(r, q),
+            }
+            prev = by_key.get(key)
+            if prev is None or item["_score"] < prev["_score"]:
+                by_key[key] = item
+
+    ranked = sorted(by_key.values(), key=lambda x: x["_score"])
+    # Prefer showing cities; if we have any PPL*, drop pure dams from the top list
+    cities = [x for x in ranked if str(x.get("feature_code", "")).upper().startswith("PPL")]
+    pool = cities if cities else ranked
+    out = []
+    for item in pool[:count]:
         out.append(
             {
-                "lat": float(r["latitude"]),
-                "lon": float(r["longitude"]),
-                "label": label or r.get("name") or "Result",
+                "lat": item["lat"],
+                "lon": item["lon"],
+                "label": item["label"],
+                "feature_code": item.get("feature_code"),
             }
         )
     return out
 
 
 def prompt_search_city(parent=None) -> dict | None:
-    """Simple GTK dialog: type a city, pick first match (or cancel)."""
+    """GTK dialog: type a city, search, pick from a list of matches."""
     dialog = Gtk.Dialog(title="GeauxWeather — Search city", modal=True)
+    dialog.set_default_size(420, 360)
     if parent is not None:
         dialog.set_transient_for(parent)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-        "Search", Gtk.ResponseType.OK,
+        "Use selected", Gtk.ResponseType.OK,
     )
     dialog.set_default_response(Gtk.ResponseType.OK)
     box = dialog.get_content_area()
     box.set_spacing(8)
     box.set_border_width(12)
+
+    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     entry = Gtk.Entry()
-    entry.set_placeholder_text("City name (e.g. Marshall, Melbourne, Sydney)")
-    entry.set_activates_default(True)
-    box.add(entry)
-    hint = Gtk.Label(label="Uses Open-Meteo geocoding. First match is applied.")
-    hint.set_line_wrap(True)
-    box.add(hint)
+    entry.set_placeholder_text("e.g. Marshall VIC · Livingston, LA · Melbourne")
+    entry.set_hexpand(True)
+    search_btn = Gtk.Button(label="Search")
+    row.pack_start(entry, True, True, 0)
+    row.pack_start(search_btn, False, False, 0)
+    box.add(row)
+
+    status = Gtk.Label(label="Type a city, then Search — pick a result below.")
+    status.set_xalign(0.0)
+    status.set_line_wrap(True)
+    box.add(status)
+
+    store = Gtk.ListStore(str, float, float)  # label, lat, lon
+    tree = Gtk.TreeView(model=store)
+    tree.append_column(Gtk.TreeViewColumn("Place", Gtk.CellRendererText(), text=0))
+    tree.set_headers_visible(False)
+    scroll = Gtk.ScrolledWindow()
+    scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    scroll.set_min_content_height(200)
+    scroll.add(tree)
+    box.add(scroll)
+
+    results_cache: list = []
+
+    def do_search(*_a) -> None:
+        nonlocal results_cache
+        q = entry.get_text().strip()
+        store.clear()
+        results_cache = []
+        if len(q) < 2:
+            status.set_text("Enter at least 2 characters.")
+            return
+        status.set_text("Searching…")
+        dialog.queue_draw()
+        # Process pending UI events so "Searching…" shows
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        try:
+            results_cache = search_cities(q, count=10)
+        except Exception as exc:
+            status.set_text(f"Search failed: {exc}")
+            return
+        if not results_cache:
+            status.set_text("No matches — try a comma (Livingston, LA) or fuller name.")
+            return
+        for item in results_cache:
+            store.append([item["label"], item["lat"], item["lon"]])
+        tree.set_cursor(Gtk.TreePath.new_first())
+        status.set_text(f"{len(results_cache)} match(es) — select one, then Use selected.")
+
+    search_btn.connect("clicked", do_search)
+    entry.connect("activate", do_search)
+
     dialog.show_all()
-    resp = dialog.run()
-    q = entry.get_text().strip()
+    # Focus the text field so typing works immediately
+    entry.grab_focus()
+
+    chosen = None
+    while True:
+        resp = dialog.run()
+        if resp != Gtk.ResponseType.OK:
+            break
+        sel = tree.get_selection()
+        model, itr = sel.get_selected()
+        if itr is None:
+            # If they hit Enter/OK without picking but we have results, use first
+            if results_cache:
+                chosen = results_cache[0]
+                break
+            status.set_text("Select a place in the list (or Search first).")
+            continue
+        label = model.get_value(itr, 0)
+        lat = model.get_value(itr, 1)
+        lon = model.get_value(itr, 2)
+        chosen = {"lat": lat, "lon": lon, "label": label}
+        break
+
     dialog.destroy()
-    if resp != Gtk.ResponseType.OK or len(q) < 2:
-        return None
-    try:
-        results = search_cities(q)
-    except Exception:
-        return None
-    return results[0] if results else None
+    return chosen
 
 
 def open_url(url: str) -> None:
