@@ -11,7 +11,7 @@ INSTALL_DIR="${HOME}/.local/share/geauxweather-widget"
 APP_DIR="${HOME}/.local/share/applications"
 AUTO_DIR="${HOME}/.config/autostart"
 ICON_DIR="${HOME}/.local/share/icons/hicolor/128x128/apps"
-TRAY_URL="${GEAUXWEATHER_TRAY_URL:-https://geauxweather.com/linux/geauxweather-linux-tray.tar.gz}"
+TRAY_URL="${GEAUXWEATHER_TRAY_URL:-https://geauxweather.com/linux/geauxweather-linux-tray.tar.gz?v=202609030434}"
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
 
