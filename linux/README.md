@@ -83,6 +83,7 @@ Created automatically on first install / first tray start:
 - **location** from network IP via `https://geauxweather.com/api/geo` when possible
 - Tray menu → **Location** (Detect / Search city) and **Units** (°C / °F)
 - Reinstall never overwrites an existing config
+- **Open website** passes `?lat=&lon=&label=&units=` so the site matches the tray (e.g. Marshall, VIC)
 
 Weather: [Open-Meteo](https://open-meteo.com/) (no API key).
 

@@ -2132,7 +2132,49 @@
     return null;
   }
 
+  /** Linux tray (and deep links) can pass ?lat=&lon=&label=&units= */
+  function locationFromQuery() {
+    try {
+      var q = new URLSearchParams(location.search || '');
+      var lat = parseFloat(q.get('lat'));
+      var lon = parseFloat(q.get('lon'));
+      if (!isFinite(lat) || !isFinite(lon)) return null;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+      var label = (q.get('label') || '').trim() || (lat.toFixed(2) + ', ' + lon.toFixed(2));
+      var units = q.get('units');
+      return { lat: lat, lon: lon, label: label, units: units };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function clearLocationQuery() {
+    try {
+      if (!location.search) return;
+      var u = new URL(location.href);
+      ['lat', 'lon', 'label', 'units', 'from'].forEach(function (k) { u.searchParams.delete(k); });
+      var next = u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash;
+      history.replaceState(null, '', next);
+    } catch (_) {}
+  }
+
   async function bootWeather() {
+    // Highest priority: deep link from Linux tray / shared URL
+    var linked = locationFromQuery();
+    if (linked) {
+      if (linked.units === 'metric' || linked.units === 'imperial') {
+        setWebUnits(linked.units);
+      } else if (linked.units === 'celsius') {
+        setWebUnits('metric');
+      } else if (linked.units === 'fahrenheit') {
+        setWebUnits('imperial');
+      }
+      await loadAt(linked.lat, linked.lon, linked.label);
+      clearLocationQuery();
+      setStatus('Location from Linux tray — saved for this browser.');
+      return;
+    }
+
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem('gw_web_loc') || 'null'); } catch (_) {}
     // Prefer a place the visitor already chose on this browser

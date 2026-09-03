@@ -1,5 +1,5 @@
 /* GeauxWeather service worker — shell offline; JS/CSS always revalidate */
-const CACHE = "geauxweather-shell-v8";
+const CACHE = "geauxweather-shell-v9";
 const SHELL = [
   "/",
   "/home-v3.html",

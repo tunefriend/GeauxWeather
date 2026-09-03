@@ -500,6 +500,41 @@ def open_url(url: str) -> None:
     webbrowser.open(url)
 
 
+def website_url(cfg: dict | None = None) -> str:
+    """Open the site with the tray's saved place so Marshall stays Marshall.
+
+    Example: https://geauxweather.com/?lat=-38.20&lon=144.36&label=Marshall%2C%20VIC&units=celsius
+    """
+    if cfg is None:
+        try:
+            cfg = load_config()
+        except Exception:
+            cfg = {}
+    try:
+        lat = float(cfg.get("lat"))
+        lon = float(cfg.get("lon"))
+    except (TypeError, ValueError):
+        return WEBSITE
+    units = cfg.get("units") if cfg.get("units") in ("celsius", "fahrenheit") else default_units_from_locale()
+    # Website uses metric/imperial; map tray celsius/fahrenheit
+    web_units = "metric" if units == "celsius" else "imperial"
+    label = str(cfg.get("label") or "").strip()
+    qs = urllib.parse.urlencode(
+        {
+            "lat": f"{lat:.5f}",
+            "lon": f"{lon:.5f}",
+            "label": label,
+            "units": web_units,
+            "from": "linux-tray",
+        }
+    )
+    return f"{WEBSITE}/?{qs}"
+
+
+def open_website(cfg: dict | None = None) -> None:
+    open_url(website_url(cfg))
+
+
 def unit_suffix(units: str) -> str:
     return "°C" if units == "celsius" else "°F"
 
@@ -643,7 +678,7 @@ class IndicatorUI:
         self.menu.append(Gtk.SeparatorMenuItem())
 
         open_item = Gtk.MenuItem(label="Open GeauxWeather website")
-        open_item.connect("activate", lambda *_: open_url(WEBSITE))
+        open_item.connect("activate", lambda *_: open_website(model.cfg))
         self.menu.append(open_item)
 
         refresh = Gtk.MenuItem(label="Refresh weather")
@@ -766,7 +801,7 @@ class PanelUI:
 
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         open_btn = Gtk.Button(label="Open site")
-        open_btn.connect("clicked", lambda *_: open_url(WEBSITE))
+        open_btn.connect("clicked", lambda *_: open_website(model.cfg))
         refresh_btn = Gtk.Button(label="↻")
         refresh_btn.connect("clicked", lambda *_: model.refresh())
         quit_btn = Gtk.Button(label="✕")
@@ -821,7 +856,7 @@ def request_quit(*_a) -> None:
 
 def main() -> int:
     if "--open" in sys.argv:
-        open_url(WEBSITE)
+        open_website()
         return 0
 
     _LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -836,9 +871,9 @@ def main() -> int:
             try:
                 old = int(_LOCK.read_text().strip())
                 os.kill(old, 0)
-                # Already in tray — open website instead of a second tray
+                # Already in tray — open website with saved location (not a second tray)
                 print(f"Already running (pid {old}); opening website")
-                open_url(WEBSITE)
+                open_website()
                 return False
             except (ValueError, OSError, ProcessLookupError):
                 # Stale lock from a crashed/old process
